@@ -1,4 +1,5 @@
 import asyncio
+import os
 import importlib
 import importlib.util
 import json
@@ -36,19 +37,33 @@ class LLMProvider:
             raise RuntimeError("boto3 is unavailable; install backend/requirements.txt")
         if self._bedrock_client is None:
             session = None
-            # 1. Try specified profile
-            if self.aws_profile:
+            # 1. Try explicit environment credentials first (standalone tokens without disk cache requirement)
+            if os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get("AWS_SECRET_ACCESS_KEY"):
                 try:
-                    s = boto3.Session(profile_name=self.aws_profile)
+                    s = boto3.Session(
+                        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+                        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                        aws_session_token=os.environ.get("AWS_SESSION_TOKEN"),
+                        region_name=self.aws_region
+                    )
+                    if s.get_credentials() is not None:
+                        session = s
+                except Exception as e:
+                    logger.debug("Boto3 env credentials session failed: %s", e)
+
+            # 2. Try AWS Profile session
+            if session is None and self.aws_profile:
+                try:
+                    s = boto3.Session(profile_name=self.aws_profile, region_name=self.aws_region)
                     if s.get_credentials() is not None:
                         session = s
                 except Exception as e:
                     logger.debug("Boto3 profile session failed: %s", e)
 
-            # 2. Try default credential chain (Env vars AWS_ACCESS_KEY_ID etc. or default profile)
+            # 3. Try default credential chain
             if session is None:
                 try:
-                    s = boto3.Session()
+                    s = boto3.Session(region_name=self.aws_region)
                     if s.get_credentials() is not None:
                         session = s
                 except Exception as e:
@@ -135,8 +150,9 @@ class LLMProvider:
         return self.get_status()
 
     async def generate_response(self, system_prompt: str, user_prompt: str, response_format: str = "json") -> Dict[str, Any]:
-        if self.provider == "bedrock" and self.ready:
+        if self.provider == "bedrock":
             try:
+                client = self._get_bedrock_client()
                 format_instruction = "\nRespond strictly in valid JSON." if response_format == "json" else ""
                 payload = {
                     "system": [{"text": system_prompt + format_instruction}],
@@ -144,7 +160,7 @@ class LLMProvider:
                     "inferenceConfig": {"max_new_tokens": 400, "temperature": 0.1, "top_p": 0.9},
                 }
                 response = await asyncio.to_thread(
-                    self._get_bedrock_client().invoke_model,
+                    client.invoke_model,
                     modelId=self.bedrock_model,
                     contentType="application/json",
                     accept="application/json",
@@ -153,6 +169,7 @@ class LLMProvider:
                 body = json.loads(response["body"].read().decode("utf-8"))
                 text = body.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
                 parsed = self._extract_json(text) if response_format == "json" else None
+                self.ready = True
                 self.last_successful_provider = "bedrock"
                 self.last_error = None
                 self.fallback_active = False

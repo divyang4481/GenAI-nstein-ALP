@@ -44,7 +44,7 @@ services:
     volumes:
       - ./mcp-server/app.py:/app/server.py
       - ./backend/app:/app/app
-      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
+      - ${USERPROFILE:-~}/.aws:/root/.aws
     depends_on:
       postgres: {condition: service_healthy}
       qdrant: {condition: service_healthy}
@@ -65,7 +65,7 @@ services:
       AUTO_REPLAY_ON_START: ${AUTO_REPLAY_ON_START:-false}
     volumes:
       - ./backend/app:/app/app
-      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
+      - ${USERPROFILE:-~}/.aws:/root/.aws
     ports:
       - "8000:8000"
     depends_on:
