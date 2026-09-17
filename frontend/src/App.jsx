@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import Header from "./components/Header";
 import MetricsRibbon from "./components/MetricsRibbon";
 import LiveEventStream from "./components/LiveEventStream";
-import AgentInspector from "./components/AgentInspector";
-import ActionConsole from "./components/ActionConsole";
+import CaseWorkspace from "./components/CaseWorkspace";
 import AwsArchitectureModal from "./components/AwsArchitectureModal";
 import EvaluationModal from "./components/EvaluationModal";
 import PolicyModal from "./components/PolicyModal";
@@ -235,7 +234,7 @@ export default function App() {
   const selectedOrder = orders.find(o => o.order_id === selectedOrderId);
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 flex flex-col selection:bg-blue-100 selection:text-blue-900">
       
       {/* Top Header & Replay Controls */}
       <Header
@@ -254,16 +253,13 @@ export default function App() {
       />
 
       {/* Main Content Dashboard */}
-      <main className="flex-1 max-w-[1780px] w-full mx-auto px-6 py-4 flex flex-col space-y-4">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-6 py-5 flex flex-col space-y-4">
         
         {/* KPI Metrics Ribbon */}
         <MetricsRibbon metrics={metrics} />
 
-        {/* 3-Column Core Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-          
-          {/* Column 1: Live Event Stream (3.5 cols) */}
-          <div className="lg:col-span-4 xl:col-span-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[370px_minmax(0,1fr)] gap-4 flex-1">
+          <div>
             <LiveEventStream
               orders={orders}
               events={events}
@@ -273,27 +269,18 @@ export default function App() {
             />
           </div>
 
-          {/* Column 2: Multi-Agent Thought & MCP Inspector (4.5 cols) */}
-          <div className="lg:col-span-4 xl:col-span-4">
-            <AgentInspector
-              selectedOrder={selectedOrder}
-              activeIncident={activeIncident}
+          <div>
+            <CaseWorkspace
+              order={selectedOrder}
+              incident={activeIncident}
               traces={traces}
               isInvestigating={isInvestigating}
-              onRunInvestigation={handleRunInvestigation}
-            />
-          </div>
-
-          {/* Column 3: HITL Operations Decision Console & Audit Ledger (4 cols) */}
-          <div className="lg:col-span-4 xl:col-span-4">
-            <ActionConsole
-              activeIncident={activeIncident}
-              auditLedger={auditLedger}
-              onSubmitDecision={handleSubmitDecision}
+              onInvestigate={handleRunInvestigation}
+              onDecision={handleSubmitDecision}
               isSubmitting={isSubmitting}
+              auditLedger={auditLedger}
             />
           </div>
-
         </div>
       </main>
 
