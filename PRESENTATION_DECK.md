@@ -42,30 +42,87 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Stream as Olist Replay Stream
+    actor Ops as Human Operations Specialist
+    participant Replay as Replay Engine (Olist Stream)
+    participant WS as WebSocket Hub (/ws)
+    participant Orch as MultiAgentOrchestrator
     participant Risk as Delivery-Risk Agent
     participant Evid as Evidence Agent
-    participant MCP as MCP Tool Server
-    participant Pol as Policy Retrieval Agent
+    participant Pol as Policy & RAG Agent
     participant Rec as Recovery Agent
-    participant Guard as Guardrail Agent
-    participant Ops as Human Operations Analyst
-    participant Ledger as Action Audit Ledger
+    participant Guard as Enterprise Guardrail Agent
+    participant MCP as MCP Tool Executor
+    participant DB as Relational Store (PostgreSQL / SQLite)
+    participant Ledger as Action Execution Ledger
 
-    Stream->>Risk: Emits Order Approaching SLA Event
-    Risk->>Risk: Calculates Risk Score (0.88 CRITICAL)
-    Risk->>Evid: Triggers Investigation
-    Evid->>MCP: Calls getSellerHistory & findSimilarCases
-    MCP-->>Evid: Returns Seller Exceptions (3 recent, 17% late rate)
-    Evid->>Pol: Passes Evidence Bundle
-    Pol->>MCP: Calls getPolicy (RAG Playbooks)
-    MCP-->>Pol: Returns Permitted Actions & Voucher Cap (R$ 25)
-    Pol->>Rec: Sends Permitted Policy Bounds
-    Rec->>Rec: Synthesizes Action Brief + Customer Draft
-    Rec->>Guard: Submits Proposed Recovery
-    Guard->>Guard: Audits Responsible AI Bounds (PASSED)
-    Guard->>Ops: Dispatches Brief to Approval Console
-    Ops->>Ledger: Approves & Executes Action (Signature Logged)
+    Replay->>WS: Broadcast ORDER_EVENT_EMITTED (transit status / SLA countdown)
+    Note over Replay,Orch: Trigger when risk_score >= 0.65 and SLA expiring < 24h
+    Replay->>Orch: run_investigation(order_id)
+
+    %% Step 1: Risk Agent
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 1: Delivery-Risk)
+    Orch->>Risk: evaluate(order_id)
+    Risk->>MCP: execute("getOrder", {order_id})
+    MCP->>DB: Query OrderModel
+    DB-->>MCP: Live order metadata & corridor state
+    MCP-->>Risk: Order payload
+    Risk->>Risk: Analyze SLA burn rate & transit bottlenecks
+    Risk-->>Orch: Risk Score (0.88 CRITICAL), Primary Factor
+    Orch->>DB: Persist Step 1 AgentTraceModel
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Risk Trace)
+
+    %% Step 2: Evidence Agent
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 2: Evidence)
+    Orch->>Evid: gather(order_data, risk_data)
+    Evid->>MCP: execute("getSellerHistory", {seller_id})
+    MCP->>DB: Query SellerHistoryModel
+    DB-->>MCP: Late order rate (17.0%), 3 recent exceptions
+    Evid->>MCP: execute("findSimilarCases", {category, state})
+    MCP-->>Evid: Historical corridor resolution benchmarks
+    Evid-->>Orch: Synthesized Factual Evidence Brief
+    Orch->>DB: Persist Step 2 AgentTraceModel
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Evidence Trace)
+
+    %% Step 3: Policy Agent
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 3: Policy & RAG)
+    Orch->>Pol: check_policies(evidence, risk)
+    Pol->>MCP: execute("getPolicy", {category: "CARRIER_ESCALATION"})
+    MCP->>DB: Query PolicyPlaybookModel
+    DB-->>MCP: POL_CARRIER_ESCALATION_01, POL_CUSTOMER_PROACTIVE_COMMS_02
+    Pol-->>Orch: Permitted actions, Prohibited actions, Voucher cap (R$ 25)
+    Orch->>DB: Persist Step 3 AgentTraceModel
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Policy Trace)
+
+    %% Step 4: Recovery Agent
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 4: Recovery)
+    Orch->>Rec: draft_recovery(order, evidence, policy)
+    Rec->>MCP: execute("escalateCarrier", {carrier, priority: "PRIORITY_1"})
+    MCP-->>Rec: Draft ticket (TKT-CARRIER-8F3E2B-99)
+    Rec->>MCP: execute("draftCustomerMessage", {order_id, voucher: 20.00})
+    MCP-->>Rec: Drafted customer communication
+    Rec-->>Orch: Executive Action Brief & Proposed Action Payload
+    Orch->>DB: Persist Step 4 AgentTraceModel
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Recovery Trace)
+
+    %% Step 5: Guardrail Agent
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 5: Guardrail)
+    Orch->>Guard: validate(recovery_plan, policy_bounds)
+    Guard->>Guard: Verify NO_AUTONOMOUS_REFUND (Passed)
+    Guard->>Guard: Verify NO_DIRECT_COMMS_WITHOUT_SIGN_OFF (Passed)
+    Guard->>Guard: Verify VOUCHER <= R$ 25.00 Cap (R$ 20.00 <= 25.00 Passed)
+    Guard-->>Orch: Guardrail Verdict: PASSED
+    Orch->>DB: Persist Step 5 AgentTraceModel
+    Orch->>DB: Create IncidentModel (status: "PENDING_REVIEW")
+    Orch->>WS: Broadcast INCIDENT_DISPATCHED_FOR_APPROVAL
+
+    %% Human-in-the-loop Decision
+    WS-->>Ops: Push pending incident to Work Queue
+    Ops->>Ops: Inspect AI traces, seller history, and policy citations
+    Ops->>Orch: POST /api/incidents/{id}/decision ("APPROVED", reviewer_notes)
+    Orch->>DB: Update IncidentModel (status: "APPROVED")
+    Orch->>Ledger: Insert ActionLedgerModel (immutable audit record)
+    Orch->>WS: Broadcast HITL_DECISION_RECORDED
+    WS-->>Ops: Update KPI Ribbon & Execution Log
 ```
 
 ---
