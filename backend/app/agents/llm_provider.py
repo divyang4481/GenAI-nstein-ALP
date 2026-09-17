@@ -1,226 +1,131 @@
-import os
+import asyncio
+import importlib
+import importlib.util
 import json
 import logging
-import asyncio
-import subprocess
-import httpx
-import boto3
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+boto3 = importlib.import_module("boto3") if importlib.util.find_spec("boto3") else None
+
 from app.config import settings
 
 logger = logging.getLogger("retailflow.llm")
 
-# Global lock to serialize inference against local Ollama instance on GPU/CPU
-_ollama_lock = asyncio.Lock()
 
 class LLMProvider:
-    """Unified LLM interface supporting AWS Bedrock (Amazon Nova / Claude), Real Local Ollama, OpenAI, Gemini, and Simulation."""
+    """Bedrock inference with an explicitly reported deterministic fallback."""
 
     def __init__(self):
         self.provider = settings.LLM_PROVIDER.lower()
         self.bedrock_model = settings.BEDROCK_MODEL
         self.aws_region = settings.AWS_REGION
-        self.ollama_host = settings.OLLAMA_HOST.rstrip("/")
-        self.ollama_model = settings.OLLAMA_MODEL
+        self.aws_profile = settings.AWS_PROFILE
+        self.allowed_models = tuple(
+            model.strip() for model in settings.BEDROCK_ALLOWED_MODELS.split(",") if model.strip()
+        )
+        if self.bedrock_model not in self.allowed_models:
+            self.allowed_models = (self.bedrock_model, *self.allowed_models)
         self._bedrock_client = None
+        self.ready = False
+        self.last_successful_provider: Optional[str] = None
+        self.last_error: Optional[str] = None
+        self.fallback_active = True
 
     def _get_bedrock_client(self):
+        if boto3 is None:
+            raise RuntimeError("boto3 is unavailable; install backend/requirements.txt")
         if self._bedrock_client is None:
-            try:
-                # 1. Try standard boto3 session
-                session = boto3.Session()
-                creds = session.get_credentials()
-                if creds:
-                    self._bedrock_client = boto3.client("bedrock-runtime", region_name=self.aws_region)
-                    return self._bedrock_client
-
-                # 2. Fallback: export credentials from AWS CLI SSO
-                res = subprocess.run(["aws", "configure", "export-credentials"], capture_output=True, text=True, check=True)
-                data = json.loads(res.stdout)
-                self._bedrock_client = boto3.client(
-                    "bedrock-runtime",
-                    region_name=self.aws_region,
-                    aws_access_key_id=data["AccessKeyId"],
-                    aws_secret_access_key=data["SecretAccessKey"],
-                    aws_session_token=data["SessionToken"]
-                )
-            except Exception as e:
-                logger.warning(f"Could not initialize AWS Bedrock client: {e}")
-                return None
+            session = boto3.Session(profile_name=self.aws_profile or None)
+            credentials = session.get_credentials()
+            if credentials is None:
+                raise RuntimeError("AWS credentials were not found by the Boto3 credential chain")
+            self._bedrock_client = session.client("bedrock-runtime", region_name=self.aws_region)
         return self._bedrock_client
 
-    def set_model(self, model_name: str, provider: Optional[str] = None):
-        if provider:
-            self.provider = provider.lower()
-        elif "nova" in model_name.lower() or "claude" in model_name.lower() or "amazon" in model_name.lower():
-            self.provider = "bedrock"
-            self.bedrock_model = model_name
-        else:
-            self.provider = "ollama"
-            self.ollama_model = model_name
-        logger.info(f"LLM Provider switched to: {self.provider} (Model: {model_name})")
+    @property
+    def active_model(self) -> str:
+        return self.bedrock_model
+
+    def validate_model(self, model_name: str) -> None:
+        if model_name not in self.allowed_models:
+            raise ValueError(f"Model '{model_name}' is not configured for this deployment")
 
     def get_status(self) -> Dict[str, Any]:
-        active_model = self.bedrock_model if self.provider == "bedrock" else self.ollama_model
         return {
             "provider": self.provider,
-            "active_model": active_model,
-            "aws_region": self.aws_region,
-            "ollama_host": self.ollama_host,
+            "active_model": self.active_model,
+            "region": self.aws_region,
+            "ready": self.ready,
+            "execution_mode": "AWS_BEDROCK" if self.ready else "DETERMINISTIC_DEMO_FALLBACK",
+            "last_successful_provider": self.last_successful_provider,
+            "last_error": self.last_error,
+            "fallback_active": self.fallback_active,
             "available_models": [
-                {"id": "us.amazon.nova-pro-v1:0", "name": "Amazon Nova Pro", "provider": "bedrock", "tier": "AWS Flagship Cloud"},
-                {"id": "us.amazon.nova-lite-v1:0", "name": "Amazon Nova Lite", "provider": "bedrock", "tier": "AWS Fast Cloud"},
-                {"id": "us.amazon.nova-micro-v1:0", "name": "Amazon Nova Micro", "provider": "bedrock", "tier": "AWS Edge Cloud"},
-                {"id": "llama3.1:latest", "name": "Meta Llama 3.1 8B", "provider": "ollama", "tier": "Local Edge"},
-                {"id": "gemma3:4b", "name": "Google Gemma 3 4B", "provider": "ollama", "tier": "Local Ultra Fast"}
-            ]
+                {"id": model, "name": "Amazon Nova Lite" if "lite" in model else "Amazon Nova Pro", "provider": "bedrock"}
+                for model in self.allowed_models
+            ],
         }
 
+    async def preflight_health_check(self) -> Dict[str, Any]:
+        if self.provider != "bedrock":
+            self.ready = False
+            self.fallback_active = True
+            self.last_error = "Only AWS Bedrock is supported as a cloud demo provider"
+            return self.get_status()
+        try:
+            self.validate_model(self.bedrock_model)
+            client = self._get_bedrock_client()
+            payload = {
+                "messages": [{"role": "user", "content": [{"text": "Reply with JSON: {\"ok\":true}"}]}],
+                "inferenceConfig": {"max_new_tokens": 16, "temperature": 0},
+            }
+            await asyncio.to_thread(
+                client.invoke_model,
+                modelId=self.bedrock_model,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps(payload),
+            )
+            self.ready = True
+            self.fallback_active = False
+            self.last_error = None
+            self.last_successful_provider = "bedrock"
+        except Exception as exc:
+            self.ready = False
+            self.fallback_active = True
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("Bedrock preflight failed: %s", self.last_error)
+        return self.get_status()
+
     async def generate_response(self, system_prompt: str, user_prompt: str, response_format: str = "json") -> Dict[str, Any]:
-        # 1. AWS Bedrock (Amazon Nova / Anthropic Claude)
-        if self.provider == "bedrock":
+        if self.provider == "bedrock" and self.ready:
             try:
-                client = self._get_bedrock_client()
-                if client:
-                    # Amazon Nova Models
-                    if "nova" in self.bedrock_model.lower():
-                        payload = {
-                            "system": [{"text": system_prompt + "\nRespond strictly in valid JSON."}],
-                            "messages": [
-                                {"role": "user", "content": [{"text": user_prompt}]}
-                            ],
-                            "inferenceConfig": {
-                                "max_new_tokens": 400,
-                                "temperature": 0.1,
-                                "top_p": 0.9
-                            }
-                        }
-                        
-                        resp = await asyncio.to_thread(
-                            client.invoke_model,
-                            modelId=self.bedrock_model,
-                            contentType="application/json",
-                            accept="application/json",
-                            body=json.dumps(payload)
-                        )
-                        raw = resp["body"].read().decode("utf-8")
-                        body = json.loads(raw)
-                        text_out = body.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
-                        logger.info(f"AWS Bedrock ({self.bedrock_model}) responded: {text_out[:120]}...")
-                        
-                        if response_format == "json":
-                            parsed = self._extract_json(text_out)
-                            if parsed:
-                                return parsed
-                        return {"text": text_out}
-                        
-                    # Anthropic Claude on Bedrock
-                    elif "claude" in self.bedrock_model.lower():
-                        payload = {
-                            "anthropic_version": "bedrock-2023-05-31",
-                            "max_tokens": 400,
-                            "temperature": 0.1,
-                            "system": system_prompt + "\nRespond strictly in valid JSON.",
-                            "messages": [{"role": "user", "content": user_prompt}]
-                        }
-                        resp = await asyncio.to_thread(
-                            client.invoke_model,
-                            modelId=self.bedrock_model,
-                            contentType="application/json",
-                            accept="application/json",
-                            body=json.dumps(payload)
-                        )
-                        raw = resp["body"].read().decode("utf-8")
-                        body = json.loads(raw)
-                        text_out = body.get("content", [{}])[0].get("text", "")
-                        if response_format == "json":
-                            parsed = self._extract_json(text_out)
-                            if parsed:
-                                return parsed
-                        return {"text": text_out}
-            except Exception as e:
-                logger.warning(f"AWS Bedrock call ({self.bedrock_model}) failed: {e}. Falling back to internal engine.")
-
-        # 2. Local Ollama (Real On-Premise / Edge Foundation Model)
-        elif self.provider == "ollama":
-            async with _ollama_lock:
-                try:
-                    async with httpx.AsyncClient(timeout=60.0) as client:
-                        payload = {
-                            "model": self.ollama_model,
-                            "messages": [
-                                {"role": "system", "content": system_prompt + "\nIMPORTANT: You must return valid JSON only."},
-                                {"role": "user", "content": user_prompt}
-                            ],
-                            "stream": False,
-                            "options": {
-                                "temperature": 0.1,
-                                "top_p": 0.9,
-                                "num_predict": 300
-                            }
-                        }
-                        if response_format == "json":
-                            payload["format"] = "json"
-
-                        res = await client.post(f"{self.ollama_host}/api/chat", json=payload)
-                        if res.status_code == 200:
-                            data = res.json()
-                            raw_content = data.get("message", {}).get("content", "")
-                            logger.info(f"Ollama ({self.ollama_model}) generated real LLM response: {raw_content[:120]}...")
-                            
-                            if response_format == "json":
-                                parsed = self._extract_json(raw_content)
-                                if parsed:
-                                    return parsed
-                            else:
-                                return {"text": raw_content}
-                        else:
-                            logger.warning(f"Ollama returned HTTP {res.status_code}: {res.text}")
-                except Exception as e:
-                    logger.warning(f"Ollama call ({self.ollama_model}) failed: {e}. Using intelligent fallback.")
-
-        # 2. OpenAI
-        elif self.provider == "openai" and settings.OPENAI_API_KEY:
-            try:
-                async with httpx.AsyncClient(timeout=20.0) as client:
-                    res = await client.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
-                        json={
-                            "model": "gpt-4o-mini",
-                            "messages": [
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": user_prompt}
-                            ],
-                            "response_format": {"type": "json_object"} if response_format == "json" else None,
-                            "temperature": 0.2
-                        }
-                    )
-                    data = res.json()
-                    content = data["choices"][0]["message"]["content"]
-                    return json.loads(content) if response_format == "json" else {"text": content}
-            except Exception as e:
-                logger.warning(f"OpenAI call failed ({e}), falling back to deterministic engine.")
-
-        # 3. Gemini
-        elif self.provider == "gemini" and settings.GEMINI_API_KEY:
-            try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
-                async with httpx.AsyncClient(timeout=20.0) as client:
-                    res = await client.post(
-                        url,
-                        json={
-                            "contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}],
-                            "generationConfig": {"responseMimeType": "application/json"} if response_format == "json" else {}
-                        }
-                    )
-                    data = res.json()
-                    content = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(content) if response_format == "json" else {"text": content}
-            except Exception as e:
-                logger.warning(f"Gemini call failed ({e}), falling back to deterministic engine.")
-
-        # Default / Fallback Deterministic Engine
+                payload = {
+                    "system": [{"text": system_prompt + "\nRespond strictly in valid JSON."}],
+                    "messages": [{"role": "user", "content": [{"text": user_prompt}]}],
+                    "inferenceConfig": {"max_new_tokens": 400, "temperature": 0.1, "top_p": 0.9},
+                }
+                response = await asyncio.to_thread(
+                    self._get_bedrock_client().invoke_model,
+                    modelId=self.bedrock_model,
+                    contentType="application/json",
+                    accept="application/json",
+                    body=json.dumps(payload),
+                )
+                body = json.loads(response["body"].read().decode("utf-8"))
+                text = body.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+                parsed = self._extract_json(text) if response_format == "json" else None
+                self.last_successful_provider = "bedrock"
+                self.last_error = None
+                self.fallback_active = False
+                return parsed or {"text": text}
+            except Exception as exc:
+                self.ready = False
+                self.fallback_active = True
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                logger.error("Bedrock inference failed; deterministic fallback is active: %s", self.last_error)
+        else:
+            self.fallback_active = True
         return self._generate_simulated_agent_response(system_prompt, user_prompt)
 
     def _extract_json(self, raw_text: str) -> Optional[Dict[str, Any]]:
@@ -307,5 +212,6 @@ class LLMProvider:
             }
 
         return {"response": "Processed successfully."}
+
 
 llm_provider = LLMProvider()

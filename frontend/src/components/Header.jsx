@@ -6,24 +6,25 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
   const [showReplay, setShowReplay] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [showLlmMenu, setShowLlmMenu] = useState(false);
-  const [activeModel, setActiveModel] = useState("us.amazon.nova-pro-v1:0");
+  const [activeModel, setActiveModel] = useState("us.amazon.nova-lite-v1:0");
   const [activeProvider, setActiveProvider] = useState("bedrock");
-  const [availableModels, setAvailableModels] = useState([
-    { id: "us.amazon.nova-pro-v1:0", name: "Amazon Nova Pro", provider: "bedrock", tier: "AWS Flagship Cloud" },
-    { id: "us.amazon.nova-lite-v1:0", name: "Amazon Nova Lite", provider: "bedrock", tier: "AWS Fast Cloud" },
-    { id: "us.amazon.nova-micro-v1:0", name: "Amazon Nova Micro", provider: "bedrock", tier: "AWS Edge Cloud" },
-    { id: "llama3.1:latest", name: "Meta Llama 3.1 8B", provider: "ollama", tier: "Local Edge" },
-    { id: "gemma3:4b", name: "Google Gemma 3 4B", provider: "ollama", tier: "Local Ultra Fast" }
-  ]);
+  const [availableModels, setAvailableModels] = useState([]);
+  const [llmReady, setLlmReady] = useState(false);
+  const [fallbackActive, setFallbackActive] = useState(true);
 
   useEffect(() => {
-    fetchLlmStatus()
+    const refreshStatus = () => fetchLlmStatus()
       .then((data) => {
         if (data.active_model) setActiveModel(data.active_model);
         if (data.provider) setActiveProvider(data.provider);
+        setLlmReady(Boolean(data.ready));
+        setFallbackActive(Boolean(data.fallback_active));
         if (data.available_models) setAvailableModels(data.available_models);
       })
       .catch(() => {});
+    refreshStatus();
+    const timer = setInterval(refreshStatus, 10000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleSelectModel = async (modelItem) => {
@@ -54,7 +55,7 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
           Olist Brazilian Dataset
         </span>
 
-        {/* Real AWS Bedrock & Ollama Model Selector */}
+        {/* AWS Bedrock readiness and deployment-approved models */}
         <div className="relative">
           <button
             onClick={() => setShowLlmMenu(!showLlmMenu)}
@@ -68,7 +69,7 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
                 ? "bg-amber-500/20 text-amber-300 border-amber-500/30" 
                 : "bg-sky-500/20 text-sky-300 border-sky-500/30"
             }`}>
-              {activeProvider === "bedrock" ? "AWS Bedrock" : "Ollama Local"}
+              {llmReady ? "AWS Bedrock • Ready" : fallbackActive ? "Demo fallback active" : "Bedrock checking"}
             </span>
             <ChevronDown className="h-3 w-3 text-slate-400" />
           </button>
@@ -77,7 +78,7 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
             <div className="absolute left-0 top-11 w-72 bg-white text-slate-700 rounded-xl border border-slate-200 shadow-xl p-2 z-50">
               <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1">
                 <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Foundation Models</p>
-                <p className="text-[10px] text-slate-500">AWS Bedrock Cloud & Local Ollama Edge</p>
+                <p className="text-[10px] text-slate-500">Models explicitly allowed by this deployment</p>
               </div>
               <div className="space-y-1">
                 {availableModels.map((m) => (

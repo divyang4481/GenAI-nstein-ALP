@@ -26,7 +26,22 @@ class MultiAgentOrchestrator:
         self.guardrail_agent = GuardrailAgent(self.mcp)
 
     async def run_investigation(self, order_id: str) -> Dict[str, Any]:
-        incident_id = f"INC-{order_id[:8].upper()}-{datetime.datetime.utcnow().strftime('%H%M%S')}"
+        existing = await self.db.execute(
+            select(IncidentModel).where(
+                IncidentModel.order_id == order_id,
+                IncidentModel.status == "PENDING_REVIEW",
+            )
+        )
+        pending = existing.scalars().first()
+        if pending:
+            return {
+                "incident_id": pending.incident_id,
+                "status": "PENDING_INCIDENT_EXISTS",
+                "incident": pending,
+                "traces": [],
+            }
+
+        incident_id = str(uuid.uuid4())
         traces: List[Dict[str, Any]] = []
 
         # 1. Delivery-Risk Agent

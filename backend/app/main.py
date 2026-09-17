@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, delete
 
 from app.config import settings
 from app.db import init_db, get_db, AsyncSessionLocal, OrderModel, IncidentModel, AgentTraceModel, ActionLedgerModel, PolicyPlaybookModel, SellerHistoryModel
@@ -23,6 +23,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     async with AsyncSessionLocal() as db:
         await seed_initial_data(db)
+
+    # Never advertise Bedrock as ready until a real invocation succeeds.
+    await llm_provider.preflight_health_check()
     
     if settings.AUTO_REPLAY_ON_START:
         replay_engine.start()
@@ -54,7 +57,7 @@ async def health():
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "llm_provider": settings.LLM_PROVIDER,
-        "active_model": llm_provider.ollama_model,
+        "active_model": llm_provider.active_model,
         "replay_active": replay_engine.is_running
     }
 
@@ -62,12 +65,20 @@ async def health():
 async def get_llm_status():
     return llm_provider.get_status()
 
+@app.post("/api/llm/preflight")
+async def preflight_llm():
+    return await llm_provider.preflight_health_check()
+
 @app.post("/api/llm/select")
 async def select_llm_model(payload: Dict[str, Any] = Body(...)):
-    model_name = payload.get("model", "us.amazon.nova-pro-v1:0")
-    provider = payload.get("provider")
-    llm_provider.set_model(model_name, provider=provider)
-    return {"status": "SUCCESS", "active_model": llm_provider.bedrock_model if llm_provider.provider == "bedrock" else llm_provider.ollama_model, "provider": llm_provider.provider}
+    model_name = payload.get("model", llm_provider.active_model)
+    try:
+        llm_provider.validate_model(model_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Selection is returned to the caller only. It deliberately does not mutate
+    # the process-wide provider used by other users/sessions.
+    return {"status": "VALID", "active_model": model_name, "provider": "bedrock"}
 
 @app.get("/api/mcp/manifest")
 async def get_mcp_manifest():
@@ -114,7 +125,9 @@ async def submit_human_decision(
     db: AsyncSession = Depends(get_db)
 ):
     """Human-in-the-Loop approval / rejection of the drafted recovery action."""
-    decision = decision_data.get("decision", "APPROVED")  # APPROVED, REJECTED
+    decision = decision_data.get("decision")
+    if decision not in {"APPROVED", "REJECTED"}:
+        raise HTTPException(status_code=422, detail="decision must be APPROVED or REJECTED")
     reviewer_notes = decision_data.get("reviewer_notes", "Verified and approved by Operations Supervisor.")
     reviewer_name = decision_data.get("reviewer_name", "Ops Specialist (Divyang)")
 
@@ -196,8 +209,13 @@ async def list_sellers(db: AsyncSession = Depends(get_db)):
     return res.scalars().all()
 
 @app.get("/api/audit-ledger")
-async def get_audit_ledger(db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(ActionLedgerModel).order_by(desc(ActionLedgerModel.executed_at)))
+async def get_audit_ledger(order_id: Optional[str] = None, incident_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    query = select(ActionLedgerModel)
+    if order_id:
+        query = query.where(ActionLedgerModel.order_id == order_id)
+    if incident_id:
+        query = query.where(ActionLedgerModel.incident_id == incident_id)
+    res = await db.execute(query.order_by(desc(ActionLedgerModel.executed_at)))
     return res.scalars().all()
 
 # Replay Engine Control Endpoints
@@ -212,8 +230,16 @@ async def pause_replay():
     return {"status": "PAUSED"}
 
 @app.post("/api/replay/reset")
-async def reset_replay():
+async def reset_replay(db: AsyncSession = Depends(get_db)):
     replay_engine.reset()
+    await db.execute(delete(ActionLedgerModel))
+    await db.execute(delete(AgentTraceModel))
+    await db.execute(delete(IncidentModel))
+    await db.execute(delete(OrderModel))
+    await db.execute(delete(SellerHistoryModel))
+    await db.execute(delete(PolicyPlaybookModel))
+    await db.commit()
+    await seed_initial_data(db)
     return {"status": "RESET"}
 
 @app.post("/api/replay/speed")

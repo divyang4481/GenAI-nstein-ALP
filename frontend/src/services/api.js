@@ -3,19 +3,27 @@ const host = typeof window !== "undefined" && window.location.hostname ? window.
 const API_BASE = import.meta.env.VITE_API_BASE || `http://${host}:8000/api`;
 const WS_BASE = import.meta.env.VITE_WS_BASE || `ws://${host}:8000/ws`;
 
+const parseResponse = async (res) => {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `API request failed (${res.status})`);
+  }
+  return res.json();
+};
+
 export const fetchOrders = async () => {
   const res = await fetch(`${API_BASE}/orders`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchIncidents = async () => {
   const res = await fetch(`${API_BASE}/incidents`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchIncidentDetails = async (incidentId) => {
   const res = await fetch(`${API_BASE}/incidents/${incidentId}`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const submitDecision = async (incidentId, decision, reviewerNotes, reviewerName) => {
@@ -28,44 +36,44 @@ export const submitDecision = async (incidentId, decision, reviewerNotes, review
       reviewer_name: reviewerName
     })
   });
-  return res.json();
+  return parseResponse(res);
 };
 
 export const triggerInvestigation = async (orderId) => {
   const res = await fetch(`${API_BASE}/investigate/${orderId}`, {
     method: "POST"
   });
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchMetrics = async () => {
   const res = await fetch(`${API_BASE}/metrics`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchPolicies = async () => {
   const res = await fetch(`${API_BASE}/policies`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchAuditLedger = async () => {
   const res = await fetch(`${API_BASE}/audit-ledger`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const runBenchmark = async () => {
   const res = await fetch(`${API_BASE}/eval/benchmark`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchMcpManifest = async () => {
   const res = await fetch(`${API_BASE}/mcp/manifest`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const fetchLlmStatus = async () => {
   const res = await fetch(`${API_BASE}/llm/status`);
-  return res.json();
+  return parseResponse(res);
 };
 
 export const selectLlmModel = async (model) => {
@@ -74,7 +82,7 @@ export const selectLlmModel = async (model) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model })
   });
-  return res.json();
+  return parseResponse(res);
 };
 
 // Replay Engine Controls
@@ -91,7 +99,13 @@ export const setReplaySpeed = async (intervalSeconds) => {
 };
 
 export const connectWebSocket = (onMessage, onOpen, onClose) => {
-  let ws = new WebSocket(WS_BASE);
+  let ws;
+  let retryTimer;
+  let stopped = false;
+
+  const connect = () => {
+    if (stopped) return;
+    ws = new WebSocket(WS_BASE);
 
   ws.onopen = () => {
     console.log(`WebSocket connected to RetailFlow backend at ${WS_BASE}`);
@@ -110,8 +124,15 @@ export const connectWebSocket = (onMessage, onOpen, onClose) => {
   ws.onclose = () => {
     console.log("WebSocket disconnected. Retrying in 3s...");
     if (onClose) onClose();
-    setTimeout(() => connectWebSocket(onMessage, onOpen, onClose), 3000);
+    if (!stopped) retryTimer = setTimeout(connect, 3000);
   };
-
-  return ws;
+  };
+  connect();
+  return {
+    close() {
+      stopped = true;
+      clearTimeout(retryTimer);
+      if (ws && ws.readyState < WebSocket.CLOSING) ws.close();
+    }
+  };
 };

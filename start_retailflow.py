@@ -3,6 +3,8 @@ import sys
 import os
 import time
 import shutil
+import asyncio
+from dotenv import load_dotenv
 
 # Ensure UTF-8 output on all operating systems and Windows console pages
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -53,16 +55,29 @@ def main():
     print(f"Python Runtime:      {py_exec}")
     print(f"Active Environment:  {os.environ.get('CONDA_DEFAULT_ENV', os.environ.get('VIRTUAL_ENV', 'System/Default'))}")
     
-    os.environ.setdefault("LLM_PROVIDER", "bedrock")
-    os.environ.setdefault("BEDROCK_MODEL", "us.amazon.nova-pro-v1:0")
-    os.environ.setdefault("AWS_REGION", "us-east-1")
-    os.environ.setdefault("OLLAMA_HOST", "http://localhost:11434")
-    os.environ.setdefault("OLLAMA_MODEL", "llama3.1:latest")
+    load_dotenv(os.path.join(backend_dir, ".env"), override=False)
 
     provider = os.environ.get("LLM_PROVIDER", "bedrock")
-    model = os.environ.get("BEDROCK_MODEL" if provider == "bedrock" else "OLLAMA_MODEL")
-    print(f"Active LLM:          {provider.upper()} ({model})")
-    print(f"AWS Region:          {os.environ.get('AWS_REGION')}")
+    model = os.environ.get("BEDROCK_MODEL", "us.amazon.nova-lite-v1:0")
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    print(f"Selected provider:   {provider.upper()}")
+    print(f"Selected model:      {model}")
+    print(f"AWS Region:          {region}")
+
+    if provider == "bedrock":
+        sys.path.insert(0, backend_dir)
+        try:
+            from app.agents.llm_provider import llm_provider
+            status = asyncio.run(llm_provider.preflight_health_check())
+        except (ImportError, ModuleNotFoundError) as exc:
+            print(f"Readiness:           NOT READY ({exc})")
+            print("Install backend requirements, including boto3, before launching.")
+            raise SystemExit(1) from exc
+        print(f"Readiness:           {'READY' if status['ready'] else 'NOT READY'}")
+        if not status["ready"]:
+            print(f"Bedrock error:       {status['last_error']}")
+            print("Authenticate the configured AWS profile or attach a valid IAM role, then retry.")
+            raise SystemExit(1)
     print("\n[1/2] Launching FastAPI Backend on http://localhost:8000 ...")
 
     # Start FastAPI backend process

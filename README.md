@@ -6,7 +6,7 @@
 [![MCP](https://img.shields.io/badge/Protocol-MCP%20Tools-FF6B6B)](https://modelcontextprotocol.io)
 [![AWS](https://img.shields.io/badge/Cloud%20Target-AWS%20Bedrock%20%2B%20Kinesis-FF9900?logo=amazon-aws&logoColor=white)](https://aws.amazon.com)
 
-**RetailFlow** is an enterprise-grade agentic AI platform designed for high-volume e-commerce marketplaces. It monitors live order lifecycle events streamed from the **Olist Brazilian E-Commerce dataset**, detects fulfillment bottlenecks and SLA delay risks in real time, investigates root causes using an autonomous multi-agent pipeline and MCP tools, enforces strict corporate guardrails, drafts recovery plans, and presents actionable briefs for **Human-in-the-Loop (HITL)** operational approval.
+**RetailFlow** is a demo of an agentic workflow for e-commerce marketplaces. It replays **historical Olist events**, detects fulfilment risks, investigates root causes through an MCP-aligned local tool contract, applies deterministic guardrails, and presents recovery briefs for **Human-in-the-Loop (HITL)** approval.
 
 ---
 
@@ -17,7 +17,7 @@
 
 ---
 
-## 🔬 5-Agent Architecture & MCP Tool Ecosystem
+## 🔬 5-Agent Architecture & MCP-aligned Local Tool Contract
 
 ```mermaid
 flowchart TD
@@ -29,14 +29,14 @@ flowchart TD
     subgraph 5-Agent Autonomous Investigation Pipeline
         B --> D[1. Delivery-Risk Agent]
         D -->|High Risk Flag >= 0.65| E[2. Evidence Agent]
-        E -->|MCP Calls| F[MCP Tool Server]
+        E -->|Local tool calls| F[MCP-aligned Tool Contract]
         E --> G[3. Policy & RAG Agent]
         G -->|RAG Playbooks| F
         G --> H[4. Recovery Agent]
         H --> I[5. Enterprise Guardrail Agent]
     end
 
-    subgraph MCP Tool Layer
+    subgraph MCP-aligned Local Tool Layer
         F --> T1[getOrder]
         F --> T2[getSellerHistory]
         F --> T3[findSimilarCases]
@@ -53,7 +53,7 @@ flowchart TD
 
 ### The 5 Specialized Agents:
 1. **Delivery-Risk Agent:** Calculates delivery risk score (0.0–1.0), SLA burn rate, and delay probability across interstate transit corridors.
-2. **Evidence Agent:** Gathers factual evidence via MCP tools (`getOrder`, `getSellerHistory`, `findSimilarCases`) highlighting seller late dispatch rates and cross-dock backlogs.
+2. **Evidence Agent:** Gathers factual evidence via the MCP-aligned local tool contract (`getOrder`, `getSellerHistory`, `findSimilarCases`) highlighting seller late dispatch rates and cross-dock backlogs.
 3. **Policy & RAG Agent:** Matches incident context against enterprise fulfillment playbooks (`POL_CARRIER_ESCALATION_01`, `POL_CUSTOMER_PROACTIVE_COMMS_02`), determining permitted actions and voucher caps.
 4. **Recovery Agent:** Synthesizes the recovery brief (proactive courier escalation + customer notification draft with compensation credit).
 5. **Enterprise Guardrail Agent:** Audits proposed recovery plans against Responsible AI policies:
@@ -69,7 +69,7 @@ flowchart TD
 | :--- | :--- | :--- |
 | **Event Replay Engine** | **Amazon Kinesis Data Streams / MSK** | High-throughput ingestion of marketplace lifecycle events |
 | **FastAPI Backend** | **AWS ECS Fargate / Lambda** | Auto-scaling serverless compute container |
-| **Multi-Agent AI Engine** | **Amazon Bedrock (Claude 3.5 Sonnet)** | Enterprise foundation model inference with strict guardrails |
+| **Multi-Agent AI Engine** | **Amazon Bedrock (Nova Lite default; Nova Pro optional)** | Generative evidence narrative and recommendations; deterministic policy guardrails |
 | **WebSocket Manager** | **Amazon API Gateway WebSocket API** | Managed persistent duplex communication with operations consoles |
 | **Relational Database** | **Amazon RDS (PostgreSQL Multi-AZ)** | ACID store for orders, SLA configs, and incidents |
 | **Audit Ledger** | **Amazon DynamoDB + CloudWatch** | High-durability, immutable audit log for compliance |
@@ -78,11 +78,7 @@ flowchart TD
 
 ## 📊 LLM Evaluation & Ground-Truth Benchmarks
 
-RetailFlow includes an automated evaluation benchmark tested against historical Olist ground truth:
-* **Precision:** 100.0% (Zero false positives on on-time orders)
-* **Recall:** 100.0% (Correctly flagged all high-risk delivery bottlenecks)
-* **Guardrail Compliance Rate:** 100.0% (Zero unauthorized action violations)
-* **Average Pipeline Latency:** ~45–320 ms
+RetailFlow includes an isolated evaluation benchmark over labelled historical Olist examples. Metrics are calculated at runtime and are not claims about production performance. Evaluation uses a temporary database and cannot alter live incidents or audit records.
 
 ---
 
@@ -91,6 +87,9 @@ RetailFlow includes an automated evaluation benchmark tested against historical 
 ### Prerequisites
 * Python 3.10+
 * Node.js 18+
+* AWS credentials available through the normal Boto3 chain (for example an SSO profile or an IAM role)
+
+Copy `backend/.env.example` to `backend/.env`, authenticate the selected `AWS_PROFILE`, and verify that the configured region and IAM policy permit the inference-profile ID. The UI displays **AWS Bedrock • Ready** only after a real smoke invocation succeeds. If it fails, deterministic output remains available but is explicitly labelled **Demo fallback active** and must not be presented as Bedrock inference. The application never shells out to export AWS credentials.
 
 ### 1. Start Backend
 ```powershell
@@ -116,7 +115,9 @@ pytest tests/test_agents.py -v
 
 ---
 
-## 🛠️ MCP Tool Manifest Summary
+## 🛠️ MCP-aligned Local Tool Contract
+
+The current implementation exposes local Python tool definitions shaped like MCP tools; it does not yet implement an MCP client/server transport.
 
 ```json
 [
