@@ -73,11 +73,13 @@ def main():
             print(f"Readiness:           NOT READY ({exc})")
             print("Install backend requirements, including boto3, before launching.")
             raise SystemExit(1) from exc
-        print(f"Readiness:           {'READY' if status['ready'] else 'NOT READY'}")
-        if not status["ready"]:
-            print(f"Bedrock error:       {status['last_error']}")
-            print("Authenticate the configured AWS profile or attach a valid IAM role, then retry.")
-            raise SystemExit(1)
+        
+        if status["ready"]:
+            print("Readiness:           READY (AWS Bedrock)")
+        else:
+            print("Readiness:           DEMO FALLBACK (Simulated High-Fidelity Mode)")
+            print(f"Bedrock notice:      {status['last_error']}")
+            print("Notice:              Running in offline demo fallback mode. For live Bedrock, set up AWS credentials.")
     print("\n[1/2] Launching FastAPI Backend on http://localhost:8000 ...")
 
     # Start FastAPI backend process
