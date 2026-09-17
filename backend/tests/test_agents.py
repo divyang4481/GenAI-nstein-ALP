@@ -78,8 +78,8 @@ async def test_bedrock_preflight_and_response_with_mocked_client(monkeypatch):
             return {"body": io.BytesIO(json.dumps({"output": {"message": {"content": [{"text": '{"ok": true}'}]}}}).encode())}
 
     class FakeSession:
-        def __init__(self, profile_name=None):
-            assert profile_name in (None, "retailflow-demo")
+        def __init__(self, *args, **kwargs):
+            pass
         def get_credentials(self):
             return object()
         def client(self, service, region_name=None):

@@ -55,14 +55,34 @@ class LocalHashEmbedder:
 class RetrievalService:
     def __init__(self, url: str | None = None, embedder: Any | None = None, client: Any | None = None):
         self.embedder = embedder or LocalHashEmbedder()
-        self.client = client or (AsyncQdrantClient(url=url or settings.QDRANT_URL) if AsyncQdrantClient else None)
+        self._url = url or settings.QDRANT_URL
+        self._client = client
         self._memory: list[tuple[list[float], dict[str, Any]]] = []
 
+    @property
+    def client(self) -> Any | None:
+        if self._client is None and self._url and AsyncQdrantClient:
+            try:
+                self._client = AsyncQdrantClient(url=self._url, timeout=5.0)
+            except Exception:
+                self._client = None
+        return self._client
+
+    @client.setter
+    def client(self, value: Any | None) -> None:
+        self._client = value
+        if value is None:
+            self._url = None
+
     async def ensure_collection(self) -> None:
-        if not self.client:
+        client = self.client
+        if not client:
             return
-        if not await self.client.collection_exists(COLLECTION):
-            await self.client.create_collection(COLLECTION, vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE))
+        try:
+            if not await client.collection_exists(COLLECTION):
+                await client.create_collection(COLLECTION, vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE))
+        except Exception:
+            pass
 
     async def upsert_documents(self, documents: list[dict[str, Any]]) -> int:
         await self.ensure_collection()
@@ -75,17 +95,25 @@ class RetrievalService:
             self._memory = [(v, p) for v, p in self._memory if p["chunk_id"] != payload["chunk_id"]]
             self._memory.append((vector, payload))
         if self.client and points:
-            await self.client.upsert(COLLECTION, points=points, wait=True)
+            try:
+                await self.client.upsert(COLLECTION, points=points, wait=True)
+            except Exception:
+                pass
         return len(documents)
 
     async def search(self, query: str, top_k: int = 5, source_type: str | None = None) -> list[RetrievedSource]:
         vector = await self.embedder.embed(query)
         matches: list[tuple[float, dict[str, Any]]] = []
-        if self.client:
-            query_filter = Filter(must=[FieldCondition(key="source_type", match=MatchValue(value=source_type))]) if source_type else None
-            response = await self.client.query_points(collection_name=COLLECTION, query=vector, query_filter=query_filter, limit=max(4, min(top_k, 6)), with_payload=True)
-            matches = [(float(point.score), point.payload or {}) for point in response.points]
-        else:
+        client = self.client
+        if client:
+            try:
+                query_filter = Filter(must=[FieldCondition(key="source_type", match=MatchValue(value=source_type))]) if source_type else None
+                response = await client.query_points(collection_name=COLLECTION, query=vector, query_filter=query_filter, limit=max(4, min(top_k, 6)), with_payload=True)
+                matches = [(float(point.score), point.payload or {}) for point in response.points]
+            except Exception:
+                matches = []
+
+        if not matches:
             for candidate, payload in self._memory:
                 if source_type and payload.get("source_type") != source_type:
                     continue

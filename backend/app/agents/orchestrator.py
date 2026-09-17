@@ -30,6 +30,21 @@ class MultiAgentOrchestrator:
         self.guardrail_agent = GuardrailAgent(self.mcp)
 
     async def run_investigation(self, order_id: str) -> Dict[str, Any]:
+        # If an active pending incident already exists for this order, prevent duplicates
+        existing_pending = (await self.db.execute(
+            select(IncidentModel).where(
+                IncidentModel.order_id == order_id,
+                IncidentModel.status.in_(["PENDING_REVIEW", "BLOCKED_HUMAN_REVIEW_REQUIRED", "PENDING_APPROVAL"])
+            )
+        )).scalars().first()
+        if existing_pending:
+            return {
+                "incident_id": existing_pending.incident_id,
+                "status": "PENDING_INCIDENT_EXISTS",
+                "traces": [],
+                "incident": existing_pending
+            }
+
         # Clean up any previous incident or traces for this order so investigation runs fresh
         existing_incidents = (await self.db.execute(
             select(IncidentModel).where(IncidentModel.order_id == order_id)

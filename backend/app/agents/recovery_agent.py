@@ -14,13 +14,44 @@ class RecoveryAgent:
         order_id = order_data.get("order_id", "")
         carrier = order_data.get("carrier_name", "Correios SEDEX")
         city = order_data.get("customer_city", "São Paulo")
+        customer_state = order_data.get("customer_state", "SP")
+        seller_state = order_data.get("seller_state", "SP")
+        category = order_data.get("product_category_name", "item").replace("_", " ")
+        price = float(order_data.get("price") or 100.0)
         
+        # Determine dynamic goodwill voucher based on order value tier and policy cap
+        policy_cap = float(policy_data.get("max_voucher_cap_brl") or 25.0)
+        if price >= 500.0:
+            suggested_voucher = min(policy_cap, 30.0 if policy_cap >= 30.0 else policy_cap)
+        elif price >= 150.0:
+            suggested_voucher = min(policy_cap, 20.0)
+        else:
+            suggested_voucher = min(policy_cap, 15.0)
+        suggested_voucher = round(max(0.0, suggested_voucher), 2)
+
+        # Dynamic revised ETA based on interstate vs intrastate corridor
+        if seller_state != customer_state:
+            revised_eta = "48h buffer (Interstate corridor priority)"
+            delay_impact = "Reduces interstate line-haul delay by ~24-48h"
+        else:
+            revised_eta = "Tomorrow by 18:00 (Local metro hub)"
+            delay_impact = "Expedites regional distribution hub dispatch by ~24h"
+
         draft = await self.mcp.execute("create_recovery_draft", {"order_id": order_id, "action_payload": {
-            "action_type": "PROACTIVE_CARRIER_ESCALATION_AND_CUSTOMER_DRAFT", "carrier_name": carrier,
-            "customer_city": city, "revised_eta": "Tomorrow by 18:00", "proposed_voucher_brl": 20.0,
+            "action_type": "PROACTIVE_CARRIER_ESCALATION_AND_CUSTOMER_DRAFT",
+            "carrier_name": carrier,
+            "customer_city": city,
+            "revised_eta": revised_eta,
+            "proposed_voucher_brl": suggested_voucher,
         }}, self.name)
         carrier_escalation_draft = draft
-        customer_message_draft = {"status": "DRAFT", "message_body": "Customer delivery update draft; no message has been sent."}
+        customer_message_draft = {
+            "status": "DRAFT",
+            "message_body": (
+                f"Customer notification draft: Proactive update regarding your {category} order to {city}, {customer_state}. "
+                f"We expedited dispatch via {carrier} ({revised_eta}) and credited R$ {suggested_voucher:.2f} store credit."
+            )
+        }
         
         system_prompt = (
             "You are the RetailFlow Recovery Agent. Formulate a recovery plan brief for the human operations team. "
@@ -38,17 +69,17 @@ class RecoveryAgent:
         latency_ms = int((time.time() - start_time) * 1000)
 
         action_brief = (
-            f"Order {order_id[:8]}... has high late-delivery risk. Its seller has 3 recent delivery exceptions "
-            f"and the estimated delivery date is within 18 hours. Recommend proactive courier escalation and "
-            f"a customer-update draft. Human approval required."
+            f"Order {order_id[:8]}... has high late-delivery risk on route {seller_state} -> {customer_state}. "
+            f"Recommend proactive courier escalation with {carrier} ({revised_eta}) and "
+            f"a customer retention update with R$ {suggested_voucher:.2f} goodwill credit. Human approval required."
         )
 
         return {
             "agent_name": self.name,
             "step_index": 4,
-            "thought": llm_res.get("thought", "Synthesized recovery brief with courier escalation and customer update."),
+            "thought": llm_res.get("thought", f"Synthesized recovery brief with {carrier} escalation and R$ {suggested_voucher:.2f} customer voucher."),
             "tool_name": "draftCustomerMessage",
-            "tool_input": {"order_id": order_id, "voucher": 20.00},
+            "tool_input": {"order_id": order_id, "voucher": suggested_voucher},
             "tool_output": {
                 "carrier_escalation": carrier_escalation_draft,
                 "customer_message": customer_message_draft
@@ -62,16 +93,16 @@ class RecoveryAgent:
                         "action_id": "ACT_01",
                         "name": "Proactive Carrier Escalation",
                         "target": f"{carrier} (Priority 1 Expedited Hub)",
-                        "impact": "Reduces regional transit sorting delay by ~24h"
+                        "impact": delay_impact
                     },
                     {
                         "action_id": "ACT_02",
-                        "name": "Customer Communication & R$ 20 Credit",
-                        "target": f"Customer in {city}",
-                        "impact": "Prevents 1-star review and retains customer trust"
+                        "name": "Customer Communication & Goodwill Credit",
+                        "target": f"Customer in {city}, {customer_state}",
+                        "impact": f"Retains customer trust with R$ {suggested_voucher:.2f} retention credit"
                     }
                 ],
-                "proposed_voucher_brl": 20.00,
+                "proposed_voucher_brl": suggested_voucher,
                 "draft_message": customer_message_draft.get("message_body"),
                 "requires_human_approval": True
             }

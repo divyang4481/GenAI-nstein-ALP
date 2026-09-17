@@ -60,7 +60,7 @@ class LLMProvider:
                 except Exception as e:
                     logger.debug("Boto3 profile session failed: %s", e)
 
-            # 3. Try default credential chain
+            # 3. Try default credential chain (IAM roles, ECS/EKS container credentials)
             if session is None:
                 try:
                     s = boto3.Session(region_name=self.aws_region)
@@ -68,25 +68,6 @@ class LLMProvider:
                         session = s
                 except Exception as e:
                     logger.debug("Boto3 default session failed: %s", e)
-
-            # 3. Fallback: Try AWS CLI credential export if aws CLI is available (e.g. for AWS SSO / aws login)
-            if session is None and self.aws_profile:
-                try:
-                    import subprocess
-                    out = subprocess.check_output(
-                        ["aws", "configure", "export-credentials", "--profile", self.aws_profile],
-                        timeout=5,
-                        stderr=subprocess.DEVNULL
-                    )
-                    cred_data = json.loads(out.decode("utf-8"))
-                    session = boto3.Session(
-                        aws_access_key_id=cred_data.get("AccessKeyId"),
-                        aws_secret_access_key=cred_data.get("SecretAccessKey"),
-                        aws_session_token=cred_data.get("SessionToken"),
-                        region_name=self.aws_region
-                    )
-                except Exception as e:
-                    logger.debug("AWS CLI export-credentials fallback failed: %s", e)
 
             if session is None or session.get_credentials() is None:
                 raise RuntimeError("AWS credentials were not found by the Boto3 credential chain")

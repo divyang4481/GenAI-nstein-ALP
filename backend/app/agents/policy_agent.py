@@ -40,6 +40,20 @@ class PolicyAgent:
         llm_res = await llm_provider.generate_response(system_prompt, user_prompt)
         latency_ms = int((time.time() - start_time) * 1000)
 
+        # Determine applicable customer compensation cap specifically from customer/carrier goodwill policies
+        customer_caps = [
+            float(source.get("metadata", {}).get("max_voucher_brl"))
+            for source in sources
+            if source.get("metadata", {}).get("category") in ("CUSTOMER_COMMS", "CARRIER_ESCALATION", "CUSTOMER_TIERS", "TRANSIT_LOSS")
+            and source.get("metadata", {}).get("max_voucher_brl") is not None
+        ]
+        all_caps = [
+            float(source.get("metadata", {}).get("max_voucher_brl"))
+            for source in sources
+            if source.get("metadata", {}).get("max_voucher_brl") is not None
+        ]
+        max_cap = max(customer_caps) if customer_caps else (max(all_caps) if all_caps else 25.0)
+
         return {
             "agent_name": self.name,
             "step_index": 3,
@@ -52,7 +66,7 @@ class PolicyAgent:
                 "applicable_policies": list(dict.fromkeys(source.get("policy_id") for source in sources if source.get("policy_id"))),
                 "permitted_actions": llm_res.get("permitted_actions", ["ESCALATE_CARRIER_PRIORITY", "DRAFT_CUSTOMER_UPDATE", "OFFER_GOODWILL_VOUCHER_MAX_25_BRL"]),
                 "prohibited_actions": llm_res.get("prohibited_actions", ["AUTO_FULL_REFUND", "CANCEL_IN_FLIGHT_SHIPMENT"]),
-                "max_voucher_cap_brl": max([source.get("metadata", {}).get("max_voucher_brl", 0.0) for source in sources] or [0.0]),
+                "max_voucher_cap_brl": max_cap,
                 "requires_human_approval": True,
                 "retrieved_sources": sources
             }
