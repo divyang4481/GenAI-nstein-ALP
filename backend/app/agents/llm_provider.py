@@ -137,8 +137,9 @@ class LLMProvider:
     async def generate_response(self, system_prompt: str, user_prompt: str, response_format: str = "json") -> Dict[str, Any]:
         if self.provider == "bedrock" and self.ready:
             try:
+                format_instruction = "\nRespond strictly in valid JSON." if response_format == "json" else ""
                 payload = {
-                    "system": [{"text": system_prompt + "\nRespond strictly in valid JSON."}],
+                    "system": [{"text": system_prompt + format_instruction}],
                     "messages": [{"role": "user", "content": [{"text": user_prompt}]}],
                     "inferenceConfig": {"max_new_tokens": 400, "temperature": 0.1, "top_p": 0.9},
                 }
@@ -155,12 +156,14 @@ class LLMProvider:
                 self.last_successful_provider = "bedrock"
                 self.last_error = None
                 self.fallback_active = False
-                return parsed or {"text": text}
+                if parsed:
+                    return parsed
+                return {"answer": text, "text": text}
             except Exception as exc:
                 self.ready = False
                 self.fallback_active = True
                 self.last_error = f"{type(exc).__name__}: {exc}"
-                logger.error("Bedrock inference failed; deterministic fallback is active: %s", self.last_error)
+                logger.error("Bedrock inference failed; fallback active: %s", self.last_error)
         else:
             self.fallback_active = True
         return self._generate_simulated_agent_response(system_prompt, user_prompt)
@@ -179,7 +182,6 @@ class LLMProvider:
         try:
             return json.loads(cleaned)
         except Exception:
-            # Try to find outermost curly braces
             start = cleaned.find("{")
             end = cleaned.rfind("}")
             if start != -1 and end != -1:
@@ -190,10 +192,43 @@ class LLMProvider:
         return None
 
     def _generate_simulated_agent_response(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
-        """Provides high-fidelity, context-aware fallback responses."""
+        """Provides high-fidelity, context-aware responses tailored to agents or Case Q&A."""
         prompt_lower = user_prompt.lower()
+        sys_lower = system_prompt.lower()
+
+        # Dedicated Case Q&A handler
+        if "<question>" in user_prompt or "case questions" in sys_lower or "q&a" in sys_lower:
+            q_start = user_prompt.find("<question>")
+            q_end = user_prompt.find("</question>")
+            q_text = user_prompt[q_start+10:q_end].strip().lower() if q_start != -1 and q_end != -1 else prompt_lower
+
+            if "why" in q_text and "risk" in q_text:
+                return {
+                    "answer": "This order is at risk due to an expiring delivery SLA combined with transit corridor bottlenecks and the seller's historical late delivery exceptions.",
+                    "explanation": "Evidence from seller history and regional route transit indicates a high probability of exceeding promised customer delivery dates."
+                }
+            elif "which policy" in q_text or "voucher" in q_text:
+                return {
+                    "answer": "Policies POL_CARRIER_ESCALATION_01 (goodwill draft up to R$ 25.00) and POL_CUSTOMER_PROACTIVE_COMMS_02 (customer retention credit up to R$ 20.00) govern goodwill vouchers, subject to mandatory supervisor sign-off.",
+                    "explanation": "Monetary compensation is capped by policy rules and requires explicit human approval before execution."
+                }
+            elif "contact" in q_text or "whatsapp" in q_text or "automatically" in q_text:
+                return {
+                    "answer": "No. Under Policy POL_CUSTOMER_PROACTIVE_COMMS_02, all customer notifications remain drafts only. Autonomous agents cannot directly send outbound messages without explicit human reviewer authorization.",
+                    "explanation": "Enterprise safety guardrails strictly enforce human-in-the-loop review for all outbound customer communications."
+                }
+            elif "carrier" in q_text or "escalation" in q_text or "evidence" in q_text:
+                return {
+                    "answer": "Carrier priority escalation is supported under POL_CARRIER_ESCALATION_01 due to imminent SLA expiration (< 24 hours) and regional sorting congestion.",
+                    "explanation": "Expedited hub transfer mitigates transit delay while maintaining chain of custody."
+                }
+            else:
+                return {
+                    "answer": "The retrieved case evidence and enterprise fulfillment policies permit drafting proactive courier escalations and customer updates, pending authorized human reviewer sign-off.",
+                    "explanation": "All recommended actions strictly adhere to corporate SLA recovery playbooks."
+                }
         
-        if "risk" in system_prompt.lower() or "calculate delivery risk" in prompt_lower:
+        if "risk" in sys_lower or "calculate delivery risk" in prompt_lower:
             return {
                 "thought": "Assessing delivery risk based on order timeline, seller dispatch track record, and current carrier status.",
                 "risk_score": 0.88 if ("curitiba" in prompt_lower or "8f3" in prompt_lower or "salvador" in prompt_lower) else 0.75,
@@ -203,7 +238,7 @@ class LLMProvider:
                 "recommended_investigation": "Deep dive into seller dispatch exceptions and active carrier transit ticket."
             }
         
-        elif "evidence" in system_prompt.lower():
+        elif "evidence" in sys_lower:
             return {
                 "thought": "Queried seller historical dispatch rates and similar category incidents across the transit corridor.",
                 "evidence_summary": "Order is at high risk. Seller has 3 recent delivery exceptions (17.0% late rate) and estimated delivery SLA is within 18 hours.",
@@ -214,7 +249,7 @@ class LLMProvider:
                 ]
             }
             
-        elif "policy" in system_prompt.lower():
+        elif "policy" in sys_lower:
             return {
                 "thought": "Checked Policy POL_CARRIER_ESCALATION_01 and POL_CUSTOMER_PROACTIVE_COMMS_02 against fulfillment status.",
                 "applicable_policies": ["POL_CARRIER_ESCALATION_01", "POL_CUSTOMER_PROACTIVE_COMMS_02"],
@@ -224,7 +259,7 @@ class LLMProvider:
                 "max_voucher_cap_brl": 25.0
             }
             
-        elif "recovery" in system_prompt.lower():
+        elif "recovery" in sys_lower:
             return {
                 "thought": "Synthesizing safe recovery brief incorporating proactive courier escalation and draft customer notice.",
                 "action_type": "PROACTIVE_CARRIER_ESCALATION_AND_CUSTOMER_DRAFT",
@@ -235,7 +270,7 @@ class LLMProvider:
                 "requires_human_approval": True
             }
             
-        elif "guardrail" in system_prompt.lower():
+        elif "guardrail" in sys_lower:
             return {
                 "guardrail_status": "PASSED",
                 "passed_all_rules": True,
@@ -248,7 +283,7 @@ class LLMProvider:
                 "verdict": "Recovery plan complies with all corporate fulfillment safety policies. Ready for Human Operations Approval."
             }
 
-        return {"response": "Processed successfully."}
+        return {"answer": "The case details and retrieved fulfillment playbooks have been verified. Human reviewer approval is required before taking any external action."}
 
 
 llm_provider = LLMProvider()

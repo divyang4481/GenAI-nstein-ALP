@@ -6,7 +6,11 @@ import json
 from typing import Any
 
 ClientSession = importlib.import_module("mcp").ClientSession if importlib.util.find_spec("mcp") else None
-streamablehttp_client = importlib.import_module("mcp.client.streamable_http").streamablehttp_client if ClientSession else None
+_stream_mod = importlib.import_module("mcp.client.streamable_http") if ClientSession else None
+streamablehttp_client = (
+    getattr(_stream_mod, "streamable_http_client", None) or getattr(_stream_mod, "streamablehttp_client", None)
+    if _stream_mod else None
+)
 
 from app.config import settings
 

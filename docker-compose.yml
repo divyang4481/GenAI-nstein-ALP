@@ -42,7 +42,8 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
       AWS_SECURITY_TOKEN: ${AWS_SECURITY_TOKEN:-}
     volumes:
-      - ./mcp-server:/app
+      - ./mcp-server/app.py:/app/server.py
+      - ./backend/app:/app/app
       - ${USERPROFILE:-~}/.aws:/root/.aws:ro
     depends_on:
       postgres: {condition: service_healthy}

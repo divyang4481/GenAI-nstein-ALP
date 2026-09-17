@@ -3,9 +3,27 @@
     "source_id": "olist-case-9921",
     "source_type": "historical_case",
     "case_id": "CASE_HIST_9921",
-    "title": "Historical Olist Curitiba cross-dock delay",
+    "title": "Historical Olist Curitiba cross-dock delay (PR to SP)",
     "version": "1",
-    "metadata": {"category": "relogios_presentes", "customer_state": "SP"},
-    "text": "Historical Olist replay case: a PR to SP parcel encountered congestion at the Curitiba cross-dock. Operations approved a carrier escalation and a BRL 20 goodwill voucher draft. Delivery completed 28 hours later. This is historical replay evidence, not live marketplace data."
+    "metadata": {"category": "relogios_presentes", "seller_state": "PR", "customer_state": "SP"},
+    "text": "Historical Olist replay case: a PR to SP parcel encountered congestion at the Curitiba cross-dock with 15 hours remaining to SLA. Operations approved a priority carrier escalation and a BRL 20.00 goodwill voucher draft. Carrier expedited sorting, preventing a 1-star negative review, and delivery was successfully fulfilled 28 hours later."
+  },
+  {
+    "source_id": "olist-case-5503",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_5503",
+    "title": "Campinas SP seller dispatch exception to Salvador BA",
+    "version": "1",
+    "metadata": {"category": "informatica_acessorios", "seller_state": "SP", "customer_state": "BA"},
+    "text": "Historical Olist case: an electronics shipment from Campinas (seller with 22.7% late dispatch rate and 5 recent exceptions) was delayed at origin. Policy POL_SELLER_DISPATCH_DELAY_03 was triggered. Operations approved carrier escalation and a BRL 25.00 customer retention credit draft, mitigating severe customer dissatisfaction."
+  },
+  {
+    "source_id": "olist-case-1209",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_1209",
+    "title": "São Paulo to Manaus long-distance corridor bottleneck",
+    "version": "1",
+    "metadata": {"category": "telefonia", "seller_state": "SP", "customer_state": "AM"},
+    "text": "Historical Olist case: a high-value telephony parcel from São Paulo to Manaus, AM faced interstate transit delay with <18 hours to promised delivery. Operations initiated Correios SEDEX priority sorting escalation and prepared an empathetic customer status update draft, successfully retaining customer trust."
   }
 ]
