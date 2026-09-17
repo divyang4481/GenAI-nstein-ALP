@@ -9,7 +9,11 @@ RetailFlow is a decision-support demonstration. It is not connected to a live ma
 Requirements: Docker Engine with Compose v2 and approximately 4 GB of free memory.
 
 ```bash
-cp .env.example .env
+# Option 1: One-click Python launcher (automatically injects active AWS profile credentials)
+python start_docker.py
+# (On Windows, you can double-click start_docker.bat)
+
+# Option 2: Direct Docker Compose
 docker compose up --build
 ```
 

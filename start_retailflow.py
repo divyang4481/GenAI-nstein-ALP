@@ -60,9 +60,11 @@ def main():
     provider = os.environ.get("LLM_PROVIDER", "bedrock")
     model = os.environ.get("BEDROCK_MODEL", "us.amazon.nova-lite-v1:0")
     region = os.environ.get("AWS_REGION", "us-east-1")
+    profile = os.environ.get("AWS_PROFILE", "divyang")
     print(f"Selected provider:   {provider.upper()}")
     print(f"Selected model:      {model}")
     print(f"AWS Region:          {region}")
+    print(f"AWS Profile:         {profile or '(default chain)'}")
 
     if provider == "bedrock":
         sys.path.insert(0, backend_dir)

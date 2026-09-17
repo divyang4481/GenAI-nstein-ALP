@@ -169,7 +169,7 @@ export default function App() {
       }
       if (res.incident) {
         setActiveIncident(res.incident);
-        setIncidents(prev => [res.incident, ...prev]);
+        setIncidents(prev => [res.incident, ...prev.filter(i => i.incident_id !== res.incident.incident_id && i.order_id !== res.incident.order_id)]);
       }
       const updatedMetrics = await fetchMetrics();
       setMetrics(updatedMetrics);

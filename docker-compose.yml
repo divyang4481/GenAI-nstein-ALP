@@ -34,8 +34,16 @@ services:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-development-token}
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_PROFILE: ${AWS_PROFILE:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-divyang}
       BEDROCK_MODEL: ${BEDROCK_MODEL:-us.amazon.nova-lite-v1:0}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_SECURITY_TOKEN: ${AWS_SECURITY_TOKEN:-}
+    volumes:
+      - ./mcp-server:/app
+      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
     depends_on:
       postgres: {condition: service_healthy}
       qdrant: {condition: service_healthy}
@@ -54,6 +62,9 @@ services:
       MCP_SERVER_URL: http://mcp-server:8001
       A2A_BASE_URL: http://backend:8000
       AUTO_REPLAY_ON_START: ${AUTO_REPLAY_ON_START:-false}
+    volumes:
+      - ./backend/app:/app/app
+      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
     ports:
       - "8000:8000"
     depends_on:
@@ -73,6 +84,8 @@ services:
     command: ["python", "/scripts/ingest_knowledge.py"]
     environment:
       <<: *backend-env
+    volumes:
+      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
     depends_on:
       qdrant: {condition: service_healthy}
     restart: "no"
@@ -84,12 +97,15 @@ services:
     environment:
       VITE_API_URL: http://localhost:8000/api
       VITE_WS_URL: ws://localhost:8000/ws
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
     ports:
       - "5173:5173"
     depends_on:
       backend: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:5173/ > /dev/null || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 15
