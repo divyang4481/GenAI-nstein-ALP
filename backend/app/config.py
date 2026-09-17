@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     DATABASE_URL: str = "sqlite+aiosqlite:///./retailflow.db"
     
-    # LLM Settings
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "mock")  # mock, gemini, bedrock, openai
+    # LLM Settings (Default: local Ollama for real local AI reasoning!)
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")  # ollama, gemini, bedrock, openai, mock
+    OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:latest")
+    
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")

@@ -9,7 +9,7 @@ import {
   ShieldCheck, 
   Zap, 
   Brain,
-  Activity
+  Cpu
 } from "lucide-react";
 
 export default function Header({
@@ -42,13 +42,16 @@ export default function Header({
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#0088cc]/20 text-[#38bdf8] border border-[#0088cc]/40 font-medium tracking-wide">
                   Cognizant Neuro AI
                 </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-medium flex items-center gap-1">
+                  <Cpu className="h-3 w-3" /> Ollama (Llama 3.1)
+                </span>
               </h1>
             </div>
             <p className="text-xs text-[#94a3b8] flex items-center gap-1.5 mt-0.5">
               <span className={`inline-block h-2 w-2 rounded-full ${wsConnected ? 'bg-emerald-400 pulse-dot' : 'bg-rose-400'}`}></span>
               <span>Real-Time Olist Marketplace Stream</span>
               <span className="text-[#475569]">•</span>
-              <span className="text-[#38bdf8] font-mono text-[11px]">Brazilian E-Commerce Replay</span>
+              <span className="text-[#38bdf8] font-mono text-[11px]">Real Local LLM Inference Active</span>
             </p>
           </div>
         </div>
