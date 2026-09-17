@@ -1,29 +1,38 @@
 import time
 from typing import Dict, Any
 from app.agents.llm_provider import llm_provider
-from app.mcp.tools import MCPToolExecutor
 
 class PolicyAgent:
     """RAG-grounded Policy Agent that checks governing SLAs, permitted playbooks, and compensation limits."""
 
-    def __init__(self, mcp_executor: MCPToolExecutor):
+    def __init__(self, mcp_executor):
         self.mcp = mcp_executor
-        self.name = "Policy & RAG Agent"
+        self.name = "Policy Retrieval Agent"
 
     async def check_policies(self, evidence_data: Dict[str, Any], risk_data: Dict[str, Any]) -> Dict[str, Any]:
         start_time = time.time()
         
         # Tool call: getPolicy (RAG lookup)
-        policies_res = await self.mcp.execute("getPolicy", {})
-        policies = policies_res.get("policies", [])
+        query = f"{risk_data.get('risk_level')} delivery risk. {evidence_data.get('evidence_summary', '')} carrier escalation customer communication voucher"
+        policies_res = await self.mcp.execute("retrieve_policy", {"query": query, "filters": {"source_type": "policy"}}, self.name)
+        sources = policies_res.get("sources", [])
+        if not sources:
+            return {
+                "agent_name": self.name, "step_index": 3,
+                "thought": "No governing policy was retrieved; action proposal is fail-closed.",
+                "tool_name": "retrieve_policy", "tool_input": {"query": query}, "tool_output": policies_res,
+                "latency_ms": int((time.time() - start_time) * 1000),
+                "result": {"applicable_policies": [], "permitted_actions": [], "prohibited_actions": ["ALL_EXTERNAL_ACTIONS"], "max_voucher_cap_brl": None, "requires_human_approval": True, "decision": "No governing policy found. Human review required. No action may be proposed.", "retrieved_sources": []},
+            }
         
         system_prompt = (
-            "You are the RetailFlow Policy & RAG Agent. Match the fulfillment incident against enterprise playbooks. "
+            "You are the RetailFlow Policy Retrieval Agent. Match the incident against only the retrieved playbook chunks. "
             "Determine strictly permitted actions, maximum voucher compensation caps, and verify human approval requirements. "
             "Output valid JSON."
         )
         user_prompt = (
-            f"Available Corporate Policies:\n{policies}\n\n"
+            "Use only retrieved evidence. If evidence is insufficient, say insufficient evidence.\n"
+            f"<retrieved_policy_chunks>{sources}</retrieved_policy_chunks>\n\n"
             f"Incident Evidence:\n{evidence_data}\n\n"
             f"Risk Level:\n{risk_data}"
         )
@@ -35,15 +44,16 @@ class PolicyAgent:
             "agent_name": self.name,
             "step_index": 3,
             "thought": llm_res.get("thought", "Checked corporate policy playbooks POL_CARRIER_ESCALATION_01 and POL_CUSTOMER_PROACTIVE_COMMS_02."),
-            "tool_name": "getPolicy",
-            "tool_input": {"scenario": "CARRIER_ESCALATION_AND_CUSTOMER_COMMS"},
+            "tool_name": "retrieve_policy",
+            "tool_input": {"query": query, "filters": {"source_type": "policy"}},
             "tool_output": policies_res,
             "latency_ms": latency_ms,
             "result": {
-                "applicable_policies": llm_res.get("applicable_policies", ["POL_CARRIER_ESCALATION_01", "POL_CUSTOMER_PROACTIVE_COMMS_02"]),
+                "applicable_policies": list(dict.fromkeys(source.get("policy_id") for source in sources if source.get("policy_id"))),
                 "permitted_actions": llm_res.get("permitted_actions", ["ESCALATE_CARRIER_PRIORITY", "DRAFT_CUSTOMER_UPDATE", "OFFER_GOODWILL_VOUCHER_MAX_25_BRL"]),
                 "prohibited_actions": llm_res.get("prohibited_actions", ["AUTO_FULL_REFUND", "CANCEL_IN_FLIGHT_SHIPMENT"]),
-                "max_voucher_cap_brl": llm_res.get("max_voucher_cap_brl", 25.0),
-                "requires_human_approval": True
+                "max_voucher_cap_brl": max([source.get("metadata", {}).get("max_voucher_brl", 0.0) for source in sources] or [0.0]),
+                "requires_human_approval": True,
+                "retrieved_sources": sources
             }
         }

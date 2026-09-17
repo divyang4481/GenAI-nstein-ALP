@@ -1,132 +1,123 @@
-# 🛒 RetailFlow — Real-Time Marketplace Fulfilment Recovery Agent
+# RetailFlow — Fulfilment Control Tower
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![Multi--Agent](https://img.shields.io/badge/Multi--Agent-5%20Agents-blueviolet)](https://github.com)
-[![MCP](https://img.shields.io/badge/Protocol-MCP%20Tools-FF6B6B)](https://modelcontextprotocol.io)
-[![AWS](https://img.shields.io/badge/Cloud%20Target-AWS%20Bedrock%20%2B%20Kinesis-FF9900?logo=amazon-aws&logoColor=white)](https://aws.amazon.com)
+RetailFlow is a laptop-runnable enterprise MVP for investigating fulfilment risk in a **historical Olist replay**. It combines a React control tower, FastAPI orchestration, PostgreSQL state, semantic retrieval in Qdrant, Amazon Bedrock generation with a clearly labelled deterministic fallback, a separate MCP Streamable HTTP tool server, deterministic safety rules, and versioned HTTP agent task envelopes.
 
-**RetailFlow** is a demo of an agentic workflow for e-commerce marketplaces. It replays **historical Olist events**, detects fulfilment risks, investigates root causes through an MCP-aligned local tool contract, applies deterministic guardrails, and presents recovery briefs for **Human-in-the-Loop (HITL)** approval.
+RetailFlow is a decision-support demonstration. It is not connected to a live marketplace, carrier, CRM, payment system, email provider, or messaging provider.
 
----
+## Run with Docker
 
-## 🎯 The Problem & The Agentic Solution
+Requirements: Docker Engine with Compose v2 and approximately 4 GB of free memory.
 
-* **The Problem:** In a marketplace, thousands of orders move through seller dispatch, regional transit cross-docks, carriers, and last-mile delivery. Operations teams typically discover delays **reactively**—after a 1-star bad review, customer complaint, or order cancellation.
-* **The RetailFlow Solution:** A real-time event stream sends order status transitions directly into a 5-agent system. The AI identifies high-risk orders, gathers seller exception histories and transit corridor bottlenecks, checks policy playbooks, drafts proactive courier escalations and customer goodwill credits, and logs approved actions into an immutable ledger.
-
----
-
-## 🔬 5-Agent Architecture & MCP-aligned Local Tool Contract
-
-```mermaid
-flowchart TD
-    subgraph Ingestion & Event Stream
-        A[Olist Historical Orders Stream] -->|WebSocket 1-3s Replay| B[FastAPI Event Ingestion Pipeline]
-        B --> C[(SQLite Database / State Store)]
-    end
-
-    subgraph 5-Agent Autonomous Investigation Pipeline
-        B --> D[1. Delivery-Risk Agent]
-        D -->|High Risk Flag >= 0.65| E[2. Evidence Agent]
-        E -->|Local tool calls| F[MCP-aligned Tool Contract]
-        E --> G[3. Policy & RAG Agent]
-        G -->|RAG Playbooks| F
-        G --> H[4. Recovery Agent]
-        H --> I[5. Enterprise Guardrail Agent]
-    end
-
-    subgraph MCP-aligned Local Tool Layer
-        F --> T1[getOrder]
-        F --> T2[getSellerHistory]
-        F --> T3[findSimilarCases]
-        F --> T4[getPolicy]
-        F --> T5[escalateCarrier]
-        F --> T6[draftCustomerMessage]
-    end
-
-    subgraph Human-in-the-Loop & Audit Ledger
-        I -->|Audited Action Brief| J[Operations Approval Console]
-        J -->|Approve / Reject Action| K[Action Execution Audit Ledger]
-    end
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
-### The 5 Specialized Agents:
-1. **Delivery-Risk Agent:** Calculates delivery risk score (0.0–1.0), SLA burn rate, and delay probability across interstate transit corridors.
-2. **Evidence Agent:** Gathers factual evidence via the MCP-aligned local tool contract (`getOrder`, `getSellerHistory`, `findSimilarCases`) highlighting seller late dispatch rates and cross-dock backlogs.
-3. **Policy & RAG Agent:** Matches incident context against enterprise fulfillment playbooks (`POL_CARRIER_ESCALATION_01`, `POL_CUSTOMER_PROACTIVE_COMMS_02`), determining permitted actions and voucher caps.
-4. **Recovery Agent:** Synthesizes the recovery brief (proactive courier escalation + customer notification draft with compensation credit).
-5. **Enterprise Guardrail Agent:** Audits proposed recovery plans against Responsible AI policies:
-   * ❌ No autonomous unconditional refunds.
-   * ❌ No unsolicited customer messages sent without human review.
-   * ✅ Proposed compensation strictly $\le$ policy maximum cap (R$ 25.00).
+Open <http://localhost:5173>. The API documentation is at <http://localhost:8000/docs>; Qdrant is bound to `127.0.0.1:6333` for local diagnostics only.
 
----
+Compose starts:
 
-## ☁️ Local MVP to AWS Cloud Production Topology
+| Service | Role | Health boundary |
+|---|---|---|
+| `frontend` | React/Vite control tower, port 5173 | HTTP root |
+| `backend` | FastAPI orchestration and read-only case Q&A, port 8000 | `/api/health` |
+| `postgres` | PostgreSQL 16 operational state | `pg_isready` |
+| `qdrant` | `retailflow_knowledge` vector collection | TCP 6333 |
+| `mcp-server` | FastMCP tools over MCP Streamable HTTP, internal port 8001 | `/health` |
+| `knowledge-ingest` | Idempotent one-shot knowledge indexing | successful exit |
 
-| Local MVP Component | AWS Production Target | Architecture Role |
-| :--- | :--- | :--- |
-| **Event Replay Engine** | **Amazon Kinesis Data Streams / MSK** | High-throughput ingestion of marketplace lifecycle events |
-| **FastAPI Backend** | **AWS ECS Fargate / Lambda** | Auto-scaling serverless compute container |
-| **Multi-Agent AI Engine** | **Amazon Bedrock (Nova Lite default; Nova Pro optional)** | Generative evidence narrative and recommendations; deterministic policy guardrails |
-| **WebSocket Manager** | **Amazon API Gateway WebSocket API** | Managed persistent duplex communication with operations consoles |
-| **Relational Database** | **Amazon RDS (PostgreSQL Multi-AZ)** | ACID store for orders, SLA configs, and incidents |
-| **Audit Ledger** | **Amazon DynamoDB + CloudWatch** | High-durability, immutable audit log for compliance |
+PostgreSQL and Qdrant use named volumes. The backend waits for PostgreSQL, Qdrant, and the MCP service health checks. No credential belongs in source control; use `.env` or your runtime secret store.
 
----
+## AWS Bedrock credentials
 
-## 📊 LLM Evaluation & Ground-Truth Benchmarks
+The backend uses the normal Boto3 credential chain. It never shells out for credentials. For a local AWS SSO profile, set `AWS_PROFILE=retailflow-demo`, mount or expose your AWS configuration to the backend container, and grant `bedrock:InvokeModel` for the configured inference profile. On ECS, prefer a task role and leave `AWS_PROFILE` empty.
 
-RetailFlow includes an isolated evaluation benchmark over labelled historical Olist examples. Metrics are calculated at runtime and are not claims about production performance. Evaluation uses a temporary database and cannot alter live incidents or audit records.
+The deployment-approved generation model is `us.amazon.nova-lite-v1:0`. The header says **AWS Bedrock • Ready** only after a live preflight invocation succeeds. Otherwise it says **Demo fallback active**, and API answers expose `execution_mode=DETERMINISTIC_DEMO_FALLBACK`.
 
----
+## What is real in this MVP
 
-## 🚀 Quickstart Guide
+### Retrieval-augmented generation
 
-### Prerequisites
-* Python 3.10+
-* Node.js 18+
-* AWS credentials available through the normal Boto3 chain (for example an SSO profile or an IAM role)
+`scripts/ingest_knowledge.py` reads versioned policy and historical-case sources from `knowledge/`, creates stable 300–500-word chunks with overlap, generates deterministic local development embeddings, and idempotently upserts them into Qdrant. `RetrievalService` searches four to six chunks and returns source ID, policy/case ID, title, chunk ID, score, version, and excerpt. Policy work is filtered to `source_type=policy`; no retrieved policy means fail-closed.
 
-Copy `backend/.env.example` to `backend/.env`, authenticate the selected `AWS_PROFILE`, and verify that the configured region and IAM policy permit the inference-profile ID. The UI displays **AWS Bedrock • Ready** only after a real smoke invocation succeeds. If it fails, deterministic output remains available but is explicitly labelled **Demo fallback active** and must not be presented as Bedrock inference. The application never shells out to export AWS credentials.
+The local hash embedder keeps an offline laptop demo reliable. It is deliberately identified as a development fallback; a production deployment should inject Amazon Titan Text Embeddings or a managed sentence-transformer service and re-index the collection with the new embedding metadata.
 
-### 1. Start Backend
-```powershell
-cd backend
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
+### MCP transport
+
+The backend uses the official MCP Python SDK as a Streamable HTTP client. The separate FastMCP service owns these tools:
+
+* `get_order(order_id)`
+* `get_seller_history(seller_id)`
+* `find_similar_cases(category, customer_state)`
+* `retrieve_policy(query, filters)`
+* `create_recovery_draft(order_id, action_payload)`
+
+`MCP_SERVICE_TOKEN` protects `/mcp`. Tool allow-lists are enforced by agent identity in the client. The recovery tool only creates drafts and has no connector capable of executing an external effect. `backend/app/mcp/tools.py` remains only as a legacy test fixture for the original isolated unit tests; the running orchestrator uses `backend/app/mcp/client.py` and never imports the fixture.
+
+### A2A-compatible HTTP envelopes
+
+Each agent publishes a card at `/agents/{agent}/.well-known/agent-card.json`, accepts versioned task envelopes at `POST /agents/{agent}/tasks`, and exposes task state at `GET /agents/{agent}/tasks/{task_id}`. Envelopes preserve task, correlation, parent, sender/receiver, schema version, status, and timestamps. This is a lightweight A2A-compatible boundary, not a claim of full conformance to every feature of an external A2A SDK.
+
+### Safety and action semantics
+
+`GuardrailEngine` is deterministic. It validates the governing policy citation, voucher type/range/cap, BRL currency, supported draft action, human-approval flag, customer-message draft status, and prompt-injection patterns. Contact and payment-shaped data is masked before it can be placed in traces or model context.
+
+The action lifecycle is:
+
+```text
+DRAFT → PENDING_REVIEW → APPROVED_FOR_EXECUTION → CONNECTOR_QUEUED → EXECUTED / FAILED
 ```
-Backend will be available at `http://localhost:8000`. Swagger API documentation at `http://localhost:8000/docs`.
 
-### 2. Start Frontend
-```powershell
+This MVP stops at `APPROVED_FOR_EXECUTION`. Approval does **not** claim carrier escalation, customer contact, a refund, or voucher issuance occurred. Case chat is read-only and answers execution requests with a draft-and-review boundary.
+
+## What remains simulated
+
+* Events and orders are a historical Olist replay, never live marketplace data.
+* External carrier and CRM connectors do not exist.
+* Voucher issuance, refunds, money movement, and customer-message delivery do not exist.
+* The retention value is explicitly a demo indicator, not a measured financial outcome.
+* The deterministic embedding fallback is intended for laptop development; production should use Titan embeddings.
+
+## Local development without Docker
+
+SQLite remains available only as a practical local/test path. Start Qdrant and the MCP server separately if you want real retrieval and tool transport.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+PYTHONPATH=backend python scripts/ingest_knowledge.py
+cd backend && uvicorn app.main:app --reload --port 8000
+```
+
+In another terminal:
+
+```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
-Open `http://localhost:5173` to interact with the RetailFlow dashboard.
 
-### 3. Run Automated Tests
-```powershell
-cd backend
-pytest tests/test_agents.py -v
+## Tests and validation
+
+```bash
+cd backend && pytest -q
+cd frontend && npm run lint && npm run build
+docker compose config
 ```
 
----
+Tests cover chunking/retrieval citations, deterministic guardrails, the MCP client boundary, A2A correlation envelopes, duplicate incident protection, isolated benchmark state, and the approval lifecycle.
 
-## 🛠️ MCP-aligned Local Tool Contract
+## Presentation demo
 
-The current implementation exposes local Python tool definitions shaped like MCP tools; it does not yet implement an MCP client/server transport.
+1. Run `docker compose up --build` and open the control tower.
+2. Confirm the badge honestly reports Bedrock readiness or deterministic fallback.
+3. Select an at-risk historical Olist order and run the investigation.
+4. Open **AI evidence & trace** to inspect concise rationale, tools, provenance, and safety checks—never private chain-of-thought.
+5. Open **Ask this case**, ask which policy permits the voucher, and expand Qdrant source citations.
+6. Ask to send a message and observe the read-only authorised-reviewer response.
+7. Approve the plan and inspect the **append-only demo audit trail** status `APPROVED_FOR_EXECUTION`.
 
-```json
-[
-  { "name": "getOrder", "description": "Fetch live Olist order record with pricing, customer geo-location, and SLA deadlines." },
-  { "name": "getSellerHistory", "description": "Retrieve seller fulfillment track record, late order rate, and exceptions count." },
-  { "name": "findSimilarCases", "description": "Search historical fulfillment resolution cases for similar routes and product categories." },
-  { "name": "getPolicy", "description": "Retrieve governing marketplace fulfillment policies and permitted action playbooks." },
-  { "name": "createCase", "description": "Initialize a formal operational incident in the recovery ledger." },
-  { "name": "escalateCarrier", "description": "Format and dispatch carrier priority escalation tickets." },
-  { "name": "draftCustomerMessage", "description": "Generate empathetic customer notification with revised delivery window and credit." }
-]
-```
+## Production hardening roadmap
+
+Use migrations rather than startup `create_all`, Secrets Manager for service tokens, TLS/mTLS and workload identity between services, Titan embeddings, an external A2A task worker/queue, row-level tenancy, OpenTelemetry, connector-specific approvals and idempotency keys, retention controls, and an append-only managed audit service before production use.

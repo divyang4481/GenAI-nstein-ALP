@@ -60,7 +60,7 @@ class IncidentModel(Base):
     order_id = Column(String(64), index=True)
     risk_level = Column(String(16))  # CRITICAL, HIGH, MEDIUM, LOW
     risk_score = Column(Float)
-    status = Column(String(32), default="PENDING_REVIEW")  # PENDING_REVIEW, APPROVED, REJECTED, AUTO_RESOLVED
+    status = Column(String(48), default="PENDING_REVIEW")
     primary_risk_factor = Column(String(256))
     evidence_summary = Column(Text)
     recommended_action = Column(Text)
@@ -72,6 +72,8 @@ class IncidentModel(Base):
     resolved_at = Column(DateTime, nullable=True)
     resolution_decision = Column(String(32), nullable=True)  # APPROVED, REJECTED
     reviewer_notes = Column(Text, nullable=True)
+    retrieved_sources = Column(JSON, default=list)
+    safety_checks = Column(JSON, default=list)
 
 class AgentTraceModel(Base):
     __tablename__ = "agent_traces"
@@ -87,6 +89,12 @@ class AgentTraceModel(Base):
     tool_output = Column(JSON, nullable=True)
     latency_ms = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    model_id = Column(String(128), nullable=True)
+    provider = Column(String(32), nullable=True)
+    execution_mode = Column(String(64), nullable=True)
+    prompt_version = Column(String(32), default="2026-09-v1")
+    retrieved_source_ids = Column(JSON, default=list)
+    correlation_id = Column(String(64), nullable=True)
 
 class ActionLedgerModel(Base):
     __tablename__ = "action_ledger"
@@ -95,7 +103,7 @@ class ActionLedgerModel(Base):
     incident_id = Column(String(64), index=True)
     order_id = Column(String(64), index=True)
     action_type = Column(String(64))  # CARRIER_ESCALATION, REROUTE_3PL, CUSTOMER_PROACTIVE_UPDATE, VOUCHER_CREDIT
-    status = Column(String(32), default="EXECUTED")  # EXECUTED, REJECTED, CANCELLED
+    status = Column(String(32), default="DRAFT")
     payload = Column(JSON)
     proposed_by = Column(String(64), default="RetailFlow Recovery Agent")
     approved_by = Column(String(64), default="Human Ops Supervisor")
@@ -114,6 +122,24 @@ class PolicyPlaybookModel(Base):
     max_voucher_brl = Column(Float, default=30.0)
     requires_human_approval = Column(Boolean, default=True)
     playbook_text = Column(Text)
+
+
+class A2ATaskModel(Base):
+    __tablename__ = "a2a_tasks"
+
+    task_id = Column(String(64), primary_key=True)
+    correlation_id = Column(String(64), index=True)
+    parent_task_id = Column(String(64), nullable=True)
+    sender_agent = Column(String(64))
+    receiver_agent = Column(String(64))
+    input_schema_version = Column(String(16), default="1.0")
+    output_schema_version = Column(String(16), default="1.0")
+    status = Column(String(32), default="SUBMITTED")
+    task_goal = Column(Text)
+    input_payload = Column(JSON)
+    output_payload = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
 
 async def init_db():
     async with engine.begin() as conn:

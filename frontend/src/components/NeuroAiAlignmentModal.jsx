@@ -8,7 +8,7 @@ export default function NeuroAiAlignmentModal({ isOpen, onClose }) {
     {
       concept: "Multi-Agent Systems",
       application: "5 Specialized Agents",
-      desc: "Delivery-Risk Agent, Evidence Agent, Policy & RAG Agent, Recovery Agent, and Enterprise Guardrail Agent operating in a stateful sequential pipeline.",
+      desc: "Delivery-Risk Agent, Evidence Agent, Policy Retrieval Agent, Recovery Agent, and Enterprise Guardrail Agent exchange versioned HTTP task envelopes.",
       icon: Cpu,
       color: "text-blue-400"
     },
@@ -22,7 +22,7 @@ export default function NeuroAiAlignmentModal({ isOpen, onClose }) {
     {
       concept: "Neuro AI",
       application: "Evidence-Grounded GenAI",
-      desc: "Generative AI models synthesize concise, factual recovery recommendations grounded directly in live order context and seller exceptions.",
+      desc: "Generative AI models synthesize concise recovery recommendations grounded in historical Olist replay evidence and retrieved policy sources.",
       icon: Sparkles,
       color: "text-cyan-400"
     },
@@ -36,7 +36,7 @@ export default function NeuroAiAlignmentModal({ isOpen, onClose }) {
     {
       concept: "Neuro IT Operations",
       application: "Operational Model",
-      desc: "Applies the operational paradigm: real-time streaming alerts, latency observability, incident/recovery lifecycle, and immutable audit trails.",
+      desc: "Applies the operational paradigm: replay alerts, latency observability, incident/recovery lifecycle, and an append-only demo audit trail.",
       icon: Activity,
       color: "text-emerald-400"
     },

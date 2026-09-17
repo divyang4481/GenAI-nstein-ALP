@@ -1,0 +1,11 @@
+[
+  {
+    "source_id": "olist-case-9921",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_9921",
+    "title": "Historical Olist Curitiba cross-dock delay",
+    "version": "1",
+    "metadata": {"category": "relogios_presentes", "customer_state": "SP"},
+    "text": "Historical Olist replay case: a PR to SP parcel encountered congestion at the Curitiba cross-dock. Operations approved a carrier escalation and a BRL 20 goodwill voucher draft. Delivery completed 28 hours later. This is historical replay evidence, not live marketplace data."
+  }
+]

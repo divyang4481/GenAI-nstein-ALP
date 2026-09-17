@@ -98,17 +98,20 @@ class MCPToolExecutor:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        if tool_name == "getOrder":
+    async def execute(self, tool_name: str, arguments: Dict[str, Any], agent_name: str | None = None) -> Dict[str, Any]:
+        if tool_name in {"getOrder", "get_order"}:
             return await self.get_order(arguments.get("order_id", ""))
-        elif tool_name == "getSellerHistory":
+        elif tool_name in {"getSellerHistory", "get_seller_history"}:
             return await self.get_seller_history(arguments.get("seller_id", ""))
-        elif tool_name == "findSimilarCases":
+        elif tool_name in {"findSimilarCases", "find_similar_cases"}:
             return await self.find_similar_cases(
-                arguments.get("product_category", ""),
+                arguments.get("product_category", arguments.get("category", "")),
                 arguments.get("customer_state", "")
             )
-        elif tool_name == "getPolicy":
+        elif tool_name in {"getPolicy", "retrieve_policy"}:
+            if tool_name == "retrieve_policy":
+                result = await self.get_policy(None)
+                return {"status": "SUCCESS", "sources": [{"source_id": p["policy_id"], "source_type": "policy", "policy_id": p["policy_id"], "title": p["title"], "chunk_id": p["policy_id"] + "-chunk", "score": 1.0, "version": "test", "text_excerpt": p["playbook_text"], "metadata": {"max_voucher_brl": p["max_voucher_brl"]}} for p in result["policies"]]}
             return await self.get_policy(arguments.get("category"))
         elif tool_name == "createCase":
             return await self.create_case(
@@ -122,6 +125,8 @@ class MCPToolExecutor:
                 arguments.get("order_id", ""),
                 arguments.get("priority_level", "PRIORITY_1_CRITICAL")
             )
+        elif tool_name == "create_recovery_draft":
+            return {"status": "DRAFT", "order_id": arguments.get("order_id"), "action_payload": arguments.get("action_payload", {}), "requires_human_approval": True}
         elif tool_name == "draftCustomerMessage":
             return await self.draft_customer_message(
                 arguments.get("order_id", ""),

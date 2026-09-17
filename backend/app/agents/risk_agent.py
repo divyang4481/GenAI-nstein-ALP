@@ -1,12 +1,15 @@
 import time
 from typing import Dict, Any
 from app.agents.llm_provider import llm_provider
-from app.mcp.tools import MCPToolExecutor
+from typing import Protocol
+
+class ToolClient(Protocol):
+    async def execute(self, tool_name: str, arguments: Dict[str, Any], agent_name: str | None = None) -> Dict[str, Any]: ...
 
 class DeliveryRiskAgent:
     """Calculates order fulfillment delivery risk, SLA burn rate, and delay likelihood."""
 
-    def __init__(self, mcp_executor: MCPToolExecutor):
+    def __init__(self, mcp_executor: ToolClient):
         self.mcp = mcp_executor
         self.name = "Delivery-Risk Agent"
 
@@ -14,7 +17,9 @@ class DeliveryRiskAgent:
         start_time = time.time()
         
         # Tool call: getOrder
-        order_data = await self.mcp.execute("getOrder", {"order_id": order_id})
+        order_data = await self.mcp.execute("get_order", {"order_id": order_id}, self.name)
+        if order_data.get("status") == "NOT_FOUND":
+            raise LookupError(f"Order {order_id} not found")
         
         system_prompt = (
             "You are the RetailFlow Delivery-Risk Agent. Your job is to analyze real-time marketplace order "

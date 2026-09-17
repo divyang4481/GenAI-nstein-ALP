@@ -38,7 +38,7 @@ async def test_mcp_tools(async_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_multi_agent_pipeline_execution(async_session: AsyncSession):
-    orchestrator = MultiAgentOrchestrator(async_session)
+    orchestrator = MultiAgentOrchestrator(async_session, MCPToolExecutor(async_session))
     result = await orchestrator.run_investigation("8f3e2b4c1a5d0987654321fedcba9876")
     
     assert result["status"] == "INCIDENT_CREATED"
@@ -47,7 +47,7 @@ async def test_multi_agent_pipeline_execution(async_session: AsyncSession):
     agent_names = [t["agent_name"] for t in result["traces"]]
     assert "Delivery-Risk Agent" in agent_names
     assert "Evidence Agent" in agent_names
-    assert "Policy & RAG Agent" in agent_names
+    assert "Policy Retrieval Agent" in agent_names
     assert "Recovery Agent" in agent_names
     assert "Enterprise Guardrail Agent" in agent_names
     
@@ -105,7 +105,7 @@ async def test_invalid_decision_is_rejected(async_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_duplicate_pending_incident_is_prevented(async_session: AsyncSession):
-    orchestrator = MultiAgentOrchestrator(async_session)
+    orchestrator = MultiAgentOrchestrator(async_session, MCPToolExecutor(async_session))
     first = await orchestrator.run_investigation("8f3e2b4c1a5d0987654321fedcba9876")
     second = await orchestrator.run_investigation("8f3e2b4c1a5d0987654321fedcba9876")
     assert second["status"] == "PENDING_INCIDENT_EXISTS"
@@ -128,7 +128,7 @@ async def test_demo_reset_clears_generated_records_and_reseeds(async_session: As
     from app.db import ActionLedgerModel, AgentTraceModel, IncidentModel, OrderModel
     from app.main import reset_replay
 
-    await MultiAgentOrchestrator(async_session).run_investigation("8f3e2b4c1a5d0987654321fedcba9876")
+    await MultiAgentOrchestrator(async_session, MCPToolExecutor(async_session)).run_investigation("8f3e2b4c1a5d0987654321fedcba9876")
     assert (await async_session.execute(select(func.count(IncidentModel.incident_id)))).scalar() == 1
     result = await reset_replay(async_session)
     assert result == {"status": "RESET"}

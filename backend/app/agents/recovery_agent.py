@@ -1,12 +1,11 @@
 import time
 from typing import Dict, Any
 from app.agents.llm_provider import llm_provider
-from app.mcp.tools import MCPToolExecutor
 
 class RecoveryAgent:
     """Formulates a multi-action recovery plan and prepares an executive action brief for human review."""
 
-    def __init__(self, mcp_executor: MCPToolExecutor):
+    def __init__(self, mcp_executor):
         self.mcp = mcp_executor
         self.name = "Recovery Agent"
 
@@ -16,20 +15,12 @@ class RecoveryAgent:
         carrier = order_data.get("carrier_name", "Correios SEDEX")
         city = order_data.get("customer_city", "São Paulo")
         
-        # Tool call 1: escalateCarrier (draft payload)
-        carrier_escalation_draft = await self.mcp.execute("escalateCarrier", {
-            "carrier_name": carrier,
-            "order_id": order_id,
-            "priority_level": "PRIORITY_1_CRITICAL"
-        })
-        
-        # Tool call 2: draftCustomerMessage
-        customer_message_draft = await self.mcp.execute("draftCustomerMessage", {
-            "order_id": order_id,
-            "customer_city": city,
-            "revised_eta": "Tomorrow by 18:00",
-            "compensation_voucher_brl": 20.00
-        })
+        draft = await self.mcp.execute("create_recovery_draft", {"order_id": order_id, "action_payload": {
+            "action_type": "PROACTIVE_CARRIER_ESCALATION_AND_CUSTOMER_DRAFT", "carrier_name": carrier,
+            "customer_city": city, "revised_eta": "Tomorrow by 18:00", "proposed_voucher_brl": 20.0,
+        }}, self.name)
+        carrier_escalation_draft = draft
+        customer_message_draft = {"status": "DRAFT", "message_body": "Customer delivery update draft; no message has been sent."}
         
         system_prompt = (
             "You are the RetailFlow Recovery Agent. Formulate a recovery plan brief for the human operations team. "
