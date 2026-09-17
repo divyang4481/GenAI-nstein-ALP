@@ -1,9 +1,10 @@
 import time
 from typing import Dict, Any, List
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy import select
 
-from app.db import OrderModel
+from app.db import Base, OrderModel
+from app.data.olist_seed import seed_initial_data
 from app.agents.orchestrator import MultiAgentOrchestrator
 
 # Ground-truth evaluation dataset from Olist historical deliveries
@@ -54,6 +55,24 @@ class RetailFlowEvaluator:
         self.orchestrator = MultiAgentOrchestrator(db)
 
     async def run_benchmark(self) -> Dict[str, Any]:
+        # Evaluation always runs in an isolated database so agent commits cannot
+        # create incidents, traces, ledger entries, or risk flags in live data.
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as isolated_db:
+            await seed_initial_data(isolated_db)
+            original_db, original_orchestrator = self.db, self.orchestrator
+            self.db = isolated_db
+            self.orchestrator = MultiAgentOrchestrator(isolated_db)
+            try:
+                return await self._run_benchmark()
+            finally:
+                self.db, self.orchestrator = original_db, original_orchestrator
+                await engine.dispose()
+
+    async def _run_benchmark(self) -> Dict[str, Any]:
         start_time = time.time()
         tp = 0  # True positive: Predicted at-risk & actually delayed
         fp = 0  # False positive: Predicted at-risk but actually on-time

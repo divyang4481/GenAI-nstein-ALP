@@ -40,7 +40,7 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Replay State
-  const [isReplaying, setIsReplaying] = useState(true);
+  const [isReplaying, setIsReplaying] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(1.5);
   const [wsConnected, setWsConnected] = useState(false);
 
@@ -220,6 +220,9 @@ export default function App() {
     await resetReplay();
     setEvents([]);
     setIsReplaying(false);
+    setActiveIncident(null);
+    setTraces([]);
+    await loadInitialData();
   };
 
   const handleTriggerNext = async () => {
@@ -251,6 +254,10 @@ export default function App() {
         onOpenNeuroModal={() => setIsNeuroModalOpen(true)}
         wsConnected={wsConnected}
       />
+      <div className="h-7 bg-slate-900 text-slate-300 px-6 flex items-center text-[11px]" aria-live="polite">
+        <span className="font-semibold text-sky-300 mr-2">LATEST EVENT</span>
+        {events[0] ? `${events[0].timestamp} · ${events[0].event_type.replaceAll("_", " ")} · Order ${events[0].order_id.slice(0, 8).toUpperCase()}` : "Historical Olist event replay paused"}
+      </div>
 
       {/* Main Content Dashboard */}
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-6 py-5 flex flex-col space-y-4">
