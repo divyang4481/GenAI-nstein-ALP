@@ -53,10 +53,12 @@ class MCPClient:
         try:
             if ClientSession is None or streamablehttp_client is None:
                 raise RuntimeError("The MCP SDK is required for service transport; install backend/requirements.txt")
-            async with streamablehttp_client(self.url, headers=self.headers) as (read, write, _):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(canonical, arguments=arguments)
+            import httpx
+            async with httpx.AsyncClient(headers=self.headers) as http_client:
+                async with streamablehttp_client(self.url, http_client=http_client) as (read, write, _):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        result = await session.call_tool(canonical, arguments=arguments)
             if result.isError:
                 raise RuntimeError(str(result.content))
             structured = result.structuredContent

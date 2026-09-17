@@ -70,13 +70,21 @@ def main():
     print("---------------------------------------------------------------------------")
     print("Press Ctrl+C to stop all containers.\n")
 
+    detached = "-d" in sys.argv or "--detach" in sys.argv or "--daemon" in sys.argv
     cmd = [docker_cmd, "compose", "up", "--build"]
+    if detached:
+        cmd.append("-d")
+
     try:
         subprocess.run(cmd, cwd=root_dir, env=env)
+        if detached:
+            print("\n>> RetailFlow containers are now running in the background!")
+            print(">> Use 'docker compose down' to stop them when finished.\n")
     except KeyboardInterrupt:
-        print("\nStopping RetailFlow Docker containers...")
-        subprocess.run([docker_cmd, "compose", "down"], cwd=root_dir)
-        print("Containers stopped.")
+        if not detached:
+            print("\nStopping RetailFlow Docker containers...")
+            subprocess.run([docker_cmd, "compose", "down"], cwd=root_dir)
+            print("Containers stopped.")
 
 if __name__ == "__main__":
     main()
