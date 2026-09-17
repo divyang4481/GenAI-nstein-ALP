@@ -48,8 +48,12 @@ def main():
     print(f"Project Root:        {root_dir}")
     print(f"Python Runtime:      {py_exec}")
     print(f"Active Environment:  {os.environ.get('CONDA_DEFAULT_ENV', os.environ.get('VIRTUAL_ENV', 'System/Default'))}")
-    print(f"Backend Directory:   {backend_dir}")
-    print(f"Frontend Directory:  {frontend_dir}")
+    os.environ.setdefault("LLM_PROVIDER", "ollama")
+    os.environ.setdefault("OLLAMA_HOST", "http://localhost:11434")
+    os.environ.setdefault("OLLAMA_MODEL", "llama3.1:latest")
+
+    print(f"LLM Provider:        Ollama ({os.environ.get('OLLAMA_MODEL')})")
+    print(f"Ollama Endpoint:     {os.environ.get('OLLAMA_HOST')}")
     print("\n[1/2] Launching FastAPI Backend on http://localhost:8000 ...")
 
     # Start FastAPI backend process

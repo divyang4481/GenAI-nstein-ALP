@@ -63,6 +63,20 @@ export const fetchMcpManifest = async () => {
   return res.json();
 };
 
+export const fetchLlmStatus = async () => {
+  const res = await fetch(`${API_BASE}/llm/status`);
+  return res.json();
+};
+
+export const selectLlmModel = async (model) => {
+  const res = await fetch(`${API_BASE}/llm/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model })
+  });
+  return res.json();
+};
+
 // Replay Engine Controls
 export const startReplay = async () => fetch(`${API_BASE}/replay/start`, { method: "POST" });
 export const pauseReplay = async () => fetch(`${API_BASE}/replay/pause`, { method: "POST" });

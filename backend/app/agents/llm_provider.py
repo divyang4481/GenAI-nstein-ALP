@@ -1,11 +1,15 @@
 import os
 import json
 import logging
+import asyncio
 import httpx
 from typing import Dict, Any, Optional
 from app.config import settings
 
 logger = logging.getLogger("retailflow.llm")
+
+# Global lock to serialize inference against local Ollama instance on GPU/CPU
+_ollama_lock = asyncio.Lock()
 
 class LLMProvider:
     """Unified LLM interface supporting Real Local Ollama, OpenAI, Gemini, Bedrock, and Simulation."""
@@ -15,42 +19,56 @@ class LLMProvider:
         self.ollama_host = settings.OLLAMA_HOST.rstrip("/")
         self.ollama_model = settings.OLLAMA_MODEL
 
+    def set_model(self, model_name: str):
+        self.ollama_model = model_name
+        logger.info(f"Ollama active model switched to: {model_name}")
+
+    def get_status(self) -> Dict[str, Any]:
+        return {
+            "provider": self.provider,
+            "ollama_host": self.ollama_host,
+            "active_model": self.ollama_model,
+            "available_local_models": ["llama3.1:latest", "gemma3:4b", "gemma4:26b"]
+        }
+
     async def generate_response(self, system_prompt: str, user_prompt: str, response_format: str = "json") -> Dict[str, Any]:
         # 1. Local Ollama (Real On-Premise / Edge Foundation Model)
         if self.provider == "ollama":
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    payload = {
-                        "model": self.ollama_model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "stream": False,
-                        "options": {
-                            "temperature": 0.2,
-                            "top_p": 0.9
+            async with _ollama_lock:
+                try:
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        payload = {
+                            "model": self.ollama_model,
+                            "messages": [
+                                {"role": "system", "content": system_prompt + "\nIMPORTANT: You must return valid JSON only."},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.1,
+                                "top_p": 0.9,
+                                "num_predict": 300
+                            }
                         }
-                    }
-                    if response_format == "json":
-                        payload["format"] = "json"
-
-                    res = await client.post(f"{self.ollama_host}/api/chat", json=payload)
-                    if res.status_code == 200:
-                        data = res.json()
-                        raw_content = data.get("message", {}).get("content", "")
-                        logger.info(f"Ollama ({self.ollama_model}) generated real LLM response: {raw_content[:120]}...")
-                        
                         if response_format == "json":
-                            parsed = self._extract_json(raw_content)
-                            if parsed:
-                                return parsed
+                            payload["format"] = "json"
+
+                        res = await client.post(f"{self.ollama_host}/api/chat", json=payload)
+                        if res.status_code == 200:
+                            data = res.json()
+                            raw_content = data.get("message", {}).get("content", "")
+                            logger.info(f"Ollama ({self.ollama_model}) generated real LLM response: {raw_content[:120]}...")
+                            
+                            if response_format == "json":
+                                parsed = self._extract_json(raw_content)
+                                if parsed:
+                                    return parsed
+                            else:
+                                return {"text": raw_content}
                         else:
-                            return {"text": raw_content}
-                    else:
-                        logger.warning(f"Ollama returned HTTP {res.status_code}: {res.text}")
-            except Exception as e:
-                logger.warning(f"Ollama call failed ({e}). Falling back to internal deterministic engine.")
+                            logger.warning(f"Ollama returned HTTP {res.status_code}: {res.text}")
+                except Exception as e:
+                    logger.warning(f"Ollama call ({self.ollama_model}) failed: {e}. Using intelligent fallback.")
 
         # 2. OpenAI
         elif self.provider == "openai" and settings.OPENAI_API_KEY:

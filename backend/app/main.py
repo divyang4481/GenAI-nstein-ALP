@@ -45,6 +45,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.agents.llm_provider import llm_provider
+
 @app.get("/api/health")
 async def health():
     return {
@@ -52,8 +54,19 @@ async def health():
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "llm_provider": settings.LLM_PROVIDER,
+        "active_model": llm_provider.ollama_model,
         "replay_active": replay_engine.is_running
     }
+
+@app.get("/api/llm/status")
+async def get_llm_status():
+    return llm_provider.get_status()
+
+@app.post("/api/llm/select")
+async def select_llm_model(payload: Dict[str, str] = Body(...)):
+    model_name = payload.get("model", "llama3.1:latest")
+    llm_provider.set_model(model_name)
+    return {"status": "SUCCESS", "active_model": llm_provider.ollama_model}
 
 @app.get("/api/mcp/manifest")
 async def get_mcp_manifest():
