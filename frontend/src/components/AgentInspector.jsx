@@ -48,17 +48,17 @@ export default function AgentInspector({
   };
 
   return (
-    <div className="glass-panel rounded-2xl flex flex-col h-[780px] overflow-hidden border border-[#27354a] bg-[#141c28]">
+    <div className="rounded-xl flex flex-col min-h-[520px] overflow-hidden border border-slate-200 bg-white text-slate-800">
       
       {/* Header */}
-      <div className="p-4 border-b border-[#27354a] bg-[#0f1622] flex items-center justify-between">
+      <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
           <div className="p-1.5 rounded-lg bg-[#0088cc]/15 border border-[#0088cc]/30">
             <Cpu className="h-4 w-4 text-[#38bdf8]" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white tracking-wide uppercase">Multi-Agent Thought & MCP Inspector</h2>
-            <p className="text-[11px] text-[#94a3b8]">5-Agent Autonomous Investigation Pipeline</p>
+            <h2 className="text-sm font-semibold text-slate-900">AI Evidence & Audit Trail</h2>
+            <p className="text-[11px] text-slate-500">Supporting evidence, reasoning and technical details</p>
           </div>
         </div>
 
