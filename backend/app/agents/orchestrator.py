@@ -31,17 +31,15 @@ class MultiAgentOrchestrator:
 
     async def run_investigation(self, order_id: str) -> Dict[str, Any]:
         # Clean up any previous incident or traces for this order so investigation runs fresh
-        existing_incidents = (await self.db.execute(
-            select(IncidentModel).where(IncidentModel.order_id == order_id)
-        )).scalars().all()
-        for old_inc in existing_incidents:
-            await self.db.execute(
-                delete(AgentTraceModel).where(
-                    (AgentTraceModel.incident_id == old_inc.incident_id) | (AgentTraceModel.order_id == order_id)
-                )
+        existing_incident = (await self.db.execute(
+            select(IncidentModel).where(
+                (IncidentModel.order_id == order_id) &
+                (IncidentModel.status == "PENDING_REVIEW")
             )
-            await self.db.delete(old_inc)
-        await self.db.flush()
+        )).scalars().first()
+
+        if existing_incident:
+            return {"incident_id": existing_incident.incident_id, "status": "PENDING_INCIDENT_EXISTS", "traces": []}
 
         incident_id = str(uuid.uuid4())
         correlation_id = str(uuid.uuid4())
