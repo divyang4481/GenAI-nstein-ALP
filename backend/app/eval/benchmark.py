@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db import Base, OrderModel
 from app.data.olist_seed import seed_initial_data
 from app.agents.orchestrator import MultiAgentOrchestrator
+from app.mcp.tools import MCPToolExecutor
 
 # Ground-truth evaluation dataset from Olist historical deliveries
 GROUND_TRUTH_DATASET: List[Dict[str, Any]] = [
@@ -65,12 +66,13 @@ class RetailFlowEvaluator:
             await seed_initial_data(isolated_db)
             original_db, original_orchestrator = self.db, self.orchestrator
             self.db = isolated_db
-            self.orchestrator = MultiAgentOrchestrator(isolated_db)
+            self.orchestrator = MultiAgentOrchestrator(isolated_db, MCPToolExecutor(isolated_db))
             try:
-                return await self._run_benchmark()
+                result = await self._run_benchmark()
             finally:
                 self.db, self.orchestrator = original_db, original_orchestrator
-                await engine.dispose()
+        await engine.dispose()
+        return result
 
     async def _run_benchmark(self) -> Dict[str, Any]:
         start_time = time.time()

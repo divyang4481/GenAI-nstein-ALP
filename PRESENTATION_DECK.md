@@ -26,11 +26,11 @@
 
 | Course / Accelerator Area | How RetailFlow Applies It |
 | :--- | :--- |
-| **Multi-Agent Systems** | 5 Specialized Agents: **Delivery-Risk Agent**, **Evidence Agent**, **Policy & RAG Agent**, **Recovery Agent**, and **Enterprise Guardrail Agent**. |
+| **Multi-Agent Systems** | 5 Specialized Agents: **Delivery-Risk Agent**, **Evidence Agent**, **Policy Retrieval Agent**, **Recovery Agent**, and **Enterprise Guardrail Agent**. |
 | **Neuro AI Multi-Agent Accelerator** | Architectural reference pattern: Stateful orchestration decoupling event ingestion, multi-tool reasoning, and operations decisioning. |
 | **Neuro AI** | Evidence-grounded Generative AI synthesizing concise, actionable recovery briefs tailored to specific fulfillment bottlenecks. |
 | **Neuro SAN** | Governed enterprise knowledge/data layer storing SLA playbooks, permitted action matrices, and compensation voucher limits. |
-| **Neuro IT Operations** | Operational paradigm: Real-time event observability, streaming WebSocket alerts, incident lifecycles, and immutable audit logs. |
+| **Neuro IT Operations** | Operational paradigm: historical replay observability, streaming WebSocket alerts, incident lifecycles, and an append-only demo audit trail. |
 | **Model Context Protocol (MCP)** | Standardized tool server: `getOrder`, `getSellerHistory`, `findSimilarCases`, `getPolicy`, `createCase`, `escalateCarrier`, `draftCustomerMessage`. |
 | **Responsible AI / Guardrails** | Strict enterprise safety: No autonomous refunds, no unsolicited customer messages without review, compensation strictly $\le$ policy cap. |
 | **LLM Evaluation** | Ground-truth benchmarking testing precision, recall, structured output validity, and guardrail compliance on historical delivery delays. |
@@ -46,7 +46,7 @@ sequenceDiagram
     participant Risk as Delivery-Risk Agent
     participant Evid as Evidence Agent
     participant MCP as MCP Tool Server
-    participant Pol as Policy & RAG Agent
+    participant Pol as Policy Retrieval Agent
     participant Rec as Recovery Agent
     participant Guard as Guardrail Agent
     participant Ops as Human Operations Analyst

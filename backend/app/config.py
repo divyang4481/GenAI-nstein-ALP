@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     API_PREFIX: str = "/api"
     DATABASE_URL: str = "sqlite+aiosqlite:///./retailflow.db"
+    QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")
+    QDRANT_COLLECTION: str = "retailflow_knowledge"
+    MCP_SERVER_URL: str = os.getenv("MCP_SERVER_URL", "http://localhost:8001")
+    MCP_SERVICE_TOKEN: str = os.getenv("MCP_SERVICE_TOKEN", "local-development-token")
+    A2A_BASE_URL: str = os.getenv("A2A_BASE_URL", "http://localhost:8000")
     
     # AWS Bedrock is the only cloud demo provider. A deterministic fallback is
     # explicit in status responses when Bedrock is unavailable.

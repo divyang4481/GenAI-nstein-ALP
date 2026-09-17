@@ -38,6 +38,7 @@ export default function App() {
   const [traces, setTraces] = useState([]);
   const [isInvestigating, setIsInvestigating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   // Replay State
   const [isReplaying, setIsReplaying] = useState(false);
@@ -78,6 +79,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to load initial data", err);
+      setApiError(err.message || "Unable to load RetailFlow data.");
     }
   };
 
@@ -88,6 +90,7 @@ export default function App() {
       setTraces(details.traces);
     } catch (err) {
       console.error("Failed to load incident details", err);
+      setApiError(err.message || "Unable to load incident details.");
     }
   };
 
@@ -172,6 +175,7 @@ export default function App() {
       setMetrics(updatedMetrics);
     } catch (e) {
       console.error("Investigation failed", e);
+      setApiError(e.message || "Investigation failed.");
     } finally {
       setIsInvestigating(false);
     }
@@ -200,6 +204,7 @@ export default function App() {
       setMetrics(updatedMetrics);
     } catch (e) {
       console.error("Failed to submit decision", e);
+      setApiError(e.message || "Decision could not be recorded.");
     } finally {
       setIsSubmitting(false);
     }
@@ -258,6 +263,7 @@ export default function App() {
         <span className="font-semibold text-sky-300 mr-2">LATEST EVENT</span>
         {events[0] ? `${events[0].timestamp} · ${events[0].event_type.replaceAll("_", " ")} · Order ${events[0].order_id.slice(0, 8).toUpperCase()}` : "Historical Olist event replay paused"}
       </div>
+      {apiError && <div role="alert" className="bg-rose-50 border-b border-rose-200 text-rose-800 px-6 py-2 text-sm flex justify-between"><span><strong>API error:</strong> {apiError}</span><button onClick={()=>setApiError("")} aria-label="Dismiss error">×</button></div>}
 
       {/* Main Content Dashboard */}
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-6 py-5 flex flex-col space-y-4">

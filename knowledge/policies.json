@@ -1,0 +1,20 @@
+[
+  {
+    "source_id": "policy-carrier-escalation-01",
+    "source_type": "policy",
+    "policy_id": "POL_CARRIER_ESCALATION_01",
+    "title": "Carrier escalation and late-delivery recovery",
+    "version": "2026.1",
+    "metadata": {"max_voucher_brl": 25, "currency": "BRL"},
+    "text": "For an in-transit order at high risk of missing its promised date, operations may prepare a priority carrier escalation draft. The escalation must not be submitted until an authorised operations reviewer approves it. A goodwill voucher draft may be proposed up to BRL 25. Refunds and money movement are prohibited in the agent workflow. Customer messages must remain drafts and must not be sent automatically. Cite this policy version in the audit record."
+  },
+  {
+    "source_id": "policy-customer-comms-02",
+    "source_type": "policy",
+    "policy_id": "POL_CUSTOMER_PROACTIVE_COMMS_02",
+    "title": "Proactive customer communications",
+    "version": "2026.1",
+    "metadata": {"currency": "BRL"},
+    "text": "RetailFlow may draft an empathetic delivery update when evidence indicates likely delay. The draft may include a revised delivery estimate supported by evidence. External delivery, email, SMS, WhatsApp, CRM contact, and promises require explicit human approval and a separate connector. Chat is advisory and cannot send a message."
+  }
+]

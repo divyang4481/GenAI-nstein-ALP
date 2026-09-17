@@ -15,7 +15,7 @@ export default function PolicyModal({ isOpen, onClose, policies }) {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Enterprise Fulfillment Policies & RAG Playbooks</h2>
+              <h2 className="text-base font-bold text-white">Enterprise Fulfilment Policy Sources</h2>
               <p className="text-xs text-slate-400">Governing SLA Protocols, Permitted Actions & Compensation Limits</p>
             </div>
           </div>

@@ -76,11 +76,11 @@ export const fetchLlmStatus = async () => {
   return parseResponse(res);
 };
 
-export const selectLlmModel = async (model) => {
-  const res = await fetch(`${API_BASE}/llm/select`, {
+export const askCase = async (orderId, question) => {
+  const res = await fetch(`${API_BASE}/cases/${orderId}/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model })
+    body: JSON.stringify({ question })
   });
   return parseResponse(res);
 };

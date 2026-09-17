@@ -1,12 +1,11 @@
 import time
 from typing import Dict, Any
 from app.agents.llm_provider import llm_provider
-from app.mcp.tools import MCPToolExecutor
 
 class EvidenceAgent:
     """Gathers seller performance history, similar past fulfillment issues, and route bottlenecks."""
 
-    def __init__(self, mcp_executor: MCPToolExecutor):
+    def __init__(self, mcp_executor):
         self.mcp = mcp_executor
         self.name = "Evidence Agent"
 
@@ -17,13 +16,13 @@ class EvidenceAgent:
         state = order_data.get("customer_state", "")
         
         # Tool call 1: getSellerHistory
-        seller_history = await self.mcp.execute("getSellerHistory", {"seller_id": seller_id})
+        seller_history = await self.mcp.execute("get_seller_history", {"seller_id": seller_id}, self.name)
         
         # Tool call 2: findSimilarCases
-        similar_cases = await self.mcp.execute("findSimilarCases", {
-            "product_category": category,
+        similar_cases = await self.mcp.execute("find_similar_cases", {
+            "category": category,
             "customer_state": state
-        })
+        }, self.name)
         
         system_prompt = (
             "You are the RetailFlow Evidence Agent. Synthesize order details, seller history, and historical "

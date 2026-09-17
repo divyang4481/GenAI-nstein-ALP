@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: retailflow
+      POSTGRES_PASSWORD: retailflow
+      POSTGRES_DB: retailflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retailflow -d retailflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ': > /dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
+    environment: &backend-env
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://retailflow:retailflow@postgres:5432/retailflow}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      MCP_SERVICE_TOKEN: ${MCP_SERVICE_TOKEN:-local-development-token}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      BEDROCK_MODEL: ${BEDROCK_MODEL:-us.amazon.nova-lite-v1:0}
+    depends_on:
+      postgres: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      <<: *backend-env
+      MCP_SERVER_URL: http://mcp-server:8001
+      A2A_BASE_URL: http://backend:8000
+      AUTO_REPLAY_ON_START: ${AUTO_REPLAY_ON_START:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      mcp-server: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  knowledge-ingest:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "/scripts/ingest_knowledge.py"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      qdrant: {condition: service_healthy}
+    restart: "no"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+      VITE_WS_URL: ws://localhost:8000/ws
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres_data:
+  qdrant_data:
