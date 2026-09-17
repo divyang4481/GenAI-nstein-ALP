@@ -1,8 +1,33 @@
 # RetailFlow — Fulfilment Control Tower
 
-RetailFlow is a laptop-runnable enterprise MVP for investigating fulfilment risk in a **historical Olist replay**. It combines a React control tower, FastAPI orchestration, PostgreSQL state, semantic retrieval in Qdrant, Amazon Bedrock generation with a clearly labelled deterministic fallback, a separate MCP Streamable HTTP tool server, deterministic safety rules, and versioned HTTP agent task envelopes.
+RetailFlow is an enterprise project for investigating fulfilment risk in a **historical Olist replay**. It combines a React control tower, FastAPI orchestration, PostgreSQL state, semantic retrieval in Qdrant, Amazon Bedrock generation with a clearly labelled deterministic fallback, a separate MCP Streamable HTTP tool server, deterministic safety rules, and versioned HTTP agent task envelopes.
 
 RetailFlow is a decision-support demonstration. It is not connected to a live marketplace, carrier, CRM, payment system, email provider, or messaging provider.
+
+## Architecture and How It Works
+
+RetailFlow operates on a multi-agent orchestration pipeline. The React frontend interacts with the FastAPI backend, which coordinates multiple specialized agents to resolve fulfilment issues. State is persisted in PostgreSQL, while Qdrant acts as a vector store for retrieving relevant policies and historical cases. Agents utilize Amazon Bedrock for generative tasks, communicating via the MCP Streamable HTTP Server for external tools.
+
+```mermaid
+flowchart TD
+    User([User]) --> Frontend[React / Vite Control Tower]
+    Frontend -- HTTP / WebSockets --> Backend[FastAPI Orchestrator]
+
+    subgraph Multi-Agent Pipeline
+        Backend --> DeliveryRisk[Delivery-Risk Agent]
+        Backend --> Evidence[Evidence Agent]
+        Backend --> Policy[Policy Agent]
+        Backend --> Recovery[Recovery Agent]
+        Backend --> Guardrail[Guardrail Agent]
+    end
+
+    Backend -- SQL --> Postgres[(PostgreSQL\nOperational State)]
+    Backend -- Vector Search --> Qdrant[(Qdrant\nKnowledge Base)]
+    Backend -- Bedrock API --> LLM[Amazon Bedrock\nLLM Generation]
+    Backend -- Streamable HTTP --> MCP[FastMCP Tool Server]
+
+    MCP --> Tools[Tools:\nget_order\nget_seller_history\nretrieve_policy\netc.]
+```
 
 ## Run with Docker
 
@@ -38,13 +63,13 @@ The backend uses the normal Boto3 credential chain. It never shells out for cred
 
 The deployment-approved generation model is `us.amazon.nova-lite-v1:0`. The header says **AWS Bedrock • Ready** only after a live preflight invocation succeeds. Otherwise it says **Demo fallback active**, and API answers expose `execution_mode=DETERMINISTIC_DEMO_FALLBACK`.
 
-## What is real in this MVP
+## What is real in this project
 
 ### Retrieval-augmented generation
 
 `scripts/ingest_knowledge.py` reads versioned policy and historical-case sources from `knowledge/`, creates stable 300–500-word chunks with overlap, generates deterministic local development embeddings, and idempotently upserts them into Qdrant. `RetrievalService` searches four to six chunks and returns source ID, policy/case ID, title, chunk ID, score, version, and excerpt. Policy work is filtered to `source_type=policy`; no retrieved policy means fail-closed.
 
-The local hash embedder keeps an offline laptop demo reliable. It is deliberately identified as a development fallback; a production deployment should inject Amazon Titan Text Embeddings or a managed sentence-transformer service and re-index the collection with the new embedding metadata.
+The local hash embedder keeps an offline demo reliable. It is deliberately identified as a development fallback; a production deployment should inject Amazon Titan Text Embeddings or a managed sentence-transformer service and re-index the collection with the new embedding metadata.
 
 ### MCP transport
 
@@ -72,7 +97,7 @@ The action lifecycle is:
 DRAFT → PENDING_REVIEW → APPROVED_FOR_EXECUTION → CONNECTOR_QUEUED → EXECUTED / FAILED
 ```
 
-This MVP stops at `APPROVED_FOR_EXECUTION`. Approval does **not** claim carrier escalation, customer contact, a refund, or voucher issuance occurred. Case chat is read-only and answers execution requests with a draft-and-review boundary.
+This project stops at `APPROVED_FOR_EXECUTION`. Approval does **not** claim carrier escalation, customer contact, a refund, or voucher issuance occurred. Case chat is read-only and answers execution requests with a draft-and-review boundary.
 
 ## What remains simulated
 
@@ -80,7 +105,7 @@ This MVP stops at `APPROVED_FOR_EXECUTION`. Approval does **not** claim carrier 
 * External carrier and CRM connectors do not exist.
 * Voucher issuance, refunds, money movement, and customer-message delivery do not exist.
 * The retention value is explicitly a demo indicator, not a measured financial outcome.
-* The deterministic embedding fallback is intended for laptop development; production should use Titan embeddings.
+* The deterministic embedding fallback is intended for development; production should use Titan embeddings.
 
 ## Local development without Docker
 

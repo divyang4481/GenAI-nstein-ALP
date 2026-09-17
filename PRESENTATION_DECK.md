@@ -2,7 +2,6 @@
 
 > **Core Positioning Statement:**  
 > *“RetailFlow applies multi-agent orchestration and MCP-based tool access to convert real-time fulfilment risk events into policy-governed, human-approved recovery recommendations.”*  
-> *(Design reference: Inspired by / aligned to Cognizant Neuro AI Multi-Agent Accelerator patterns)*
 
 ---
 
@@ -22,15 +21,15 @@
 
 ---
 
-## 📑 Slide 3: Application of Technologies & Cognizant Neuro AI Mapping
+## 📑 Slide 3: Application of Technologies
 
 | Course / Accelerator Area | How RetailFlow Applies It |
 | :--- | :--- |
 | **Multi-Agent Systems** | 5 Specialized Agents: **Delivery-Risk Agent**, **Evidence Agent**, **Policy Retrieval Agent**, **Recovery Agent**, and **Enterprise Guardrail Agent**. |
-| **Neuro AI Multi-Agent Accelerator** | Architectural reference pattern: Stateful orchestration decoupling event ingestion, multi-tool reasoning, and operations decisioning. |
-| **Neuro AI** | Evidence-grounded Generative AI synthesizing concise, actionable recovery briefs tailored to specific fulfillment bottlenecks. |
-| **Neuro SAN** | Governed enterprise knowledge/data layer storing SLA playbooks, permitted action matrices, and compensation voucher limits. |
-| **Neuro IT Operations** | Operational paradigm: historical replay observability, streaming WebSocket alerts, incident lifecycles, and an append-only demo audit trail. |
+| **Multi-Agent Architecture** | Architectural reference pattern: Stateful orchestration decoupling event ingestion, multi-tool reasoning, and operations decisioning. |
+| **Generative AI** | Evidence-grounded Generative AI synthesizing concise, actionable recovery briefs tailored to specific fulfillment bottlenecks. |
+| **Enterprise Knowledge/Data Layer** | Governed enterprise knowledge/data layer storing SLA playbooks, permitted action matrices, and compensation voucher limits. |
+| **IT Operations** | Operational paradigm: historical replay observability, streaming WebSocket alerts, incident lifecycles, and an append-only demo audit trail. |
 | **Model Context Protocol (MCP)** | Standardized tool server: `getOrder`, `getSellerHistory`, `findSimilarCases`, `getPolicy`, `createCase`, `escalateCarrier`, `draftCustomerMessage`. |
 | **Responsible AI / Guardrails** | Strict enterprise safety: No autonomous refunds, no unsolicited customer messages without review, compensation strictly $\le$ policy cap. |
 | **LLM Evaluation** | Ground-truth benchmarking testing precision, recall, structured output validity, and guardrail compliance on historical delivery delays. |
@@ -127,8 +126,5 @@ When presenting the live demo, walk through this exact 7-step sequence:
 ### Q1: Why did you build an event-driven recovery agent instead of just a sales forecasting model?
 > **Answer:** *"Sales forecasting is static and purely predictive. In real-world enterprise operations, the primary value of Agentic AI lies in **autonomous goal-driven recovery**—detecting an in-flight delivery anomaly, querying cross-functional systems via MCP tools, synthesizing an evidence-grounded action, and keeping human operations in the loop before customer trust is compromised."*
 
-### Q2: How does RetailFlow align with Cognizant Neuro AI?
-> **Answer:** *"RetailFlow's architecture is aligned to Cognizant Neuro AI Multi-Agent Accelerator patterns. It decouples high-frequency event ingestion from multi-agent reasoning, uses Neuro SAN principles as the governed policy knowledge layer, and adopts the Neuro IT Operations incident lifecycle with comprehensive auditability."*
-
-### Q3: How do you prevent LLM hallucinations or unauthorized refunds?
+### Q2: How do you prevent LLM hallucinations or unauthorized refunds?
 > **Answer:** *"We implement a dedicated Enterprise Guardrail Agent and strict Human-in-the-Loop gates. The LLM is programmatically constrained by structured JSON schemas, vouchers cannot exceed policy caps, and no monetary refund or customer communication can execute without an operations analyst's cryptographic sign-off in the ledger."*
