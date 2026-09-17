@@ -4,8 +4,8 @@
     "source_type": "historical_case",
     "case_id": "CASE_HIST_9921",
     "title": "Historical Olist Curitiba cross-dock delay (PR to SP)",
-    "version": "1",
-    "metadata": {"category": "relogios_presentes", "seller_state": "PR", "customer_state": "SP"},
+    "version": "2026.2",
+    "metadata": {"category": "relogios_presentes", "seller_state": "PR", "customer_state": "SP", "order_value": 389.90},
     "text": "Historical Olist replay case: a PR to SP parcel encountered congestion at the Curitiba cross-dock with 15 hours remaining to SLA. Operations approved a priority carrier escalation and a BRL 20.00 goodwill voucher draft. Carrier expedited sorting, preventing a 1-star negative review, and delivery was successfully fulfilled 28 hours later."
   },
   {
@@ -13,8 +13,8 @@
     "source_type": "historical_case",
     "case_id": "CASE_HIST_5503",
     "title": "Campinas SP seller dispatch exception to Salvador BA",
-    "version": "1",
-    "metadata": {"category": "informatica_acessorios", "seller_state": "SP", "customer_state": "BA"},
+    "version": "2026.2",
+    "metadata": {"category": "informatica_acessorios", "seller_state": "SP", "customer_state": "BA", "order_value": 620.00},
     "text": "Historical Olist case: an electronics shipment from Campinas (seller with 22.7% late dispatch rate and 5 recent exceptions) was delayed at origin. Policy POL_SELLER_DISPATCH_DELAY_03 was triggered. Operations approved carrier escalation and a BRL 25.00 customer retention credit draft, mitigating severe customer dissatisfaction."
   },
   {
@@ -22,8 +22,53 @@
     "source_type": "historical_case",
     "case_id": "CASE_HIST_1209",
     "title": "São Paulo to Manaus long-distance corridor bottleneck",
-    "version": "1",
-    "metadata": {"category": "telefonia", "seller_state": "SP", "customer_state": "AM"},
+    "version": "2026.2",
+    "metadata": {"category": "telefonia", "seller_state": "SP", "customer_state": "AM", "order_value": 1420.00},
     "text": "Historical Olist case: a high-value telephony parcel from São Paulo to Manaus, AM faced interstate transit delay with <18 hours to promised delivery. Operations initiated Correios SEDEX priority sorting escalation and prepared an empathetic customer status update draft, successfully retaining customer trust."
+  },
+  {
+    "source_id": "olist-case-4412",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_4412",
+    "title": "Belo Horizonte MG regional distribution hub congestion",
+    "version": "2026.2",
+    "metadata": {"category": "utilidades_domesticas", "seller_state": "SP", "customer_state": "MG", "order_value": 189.50},
+    "text": "Historical Olist case: home utility merchandise dispatched from Franca SP experienced sorting backlog at Belo Horizonte distribution center. SLA burn rate exceeded 80%. Recovery agent proposed 3PL transfer to Loggi Express and a BRL 15.00 courtesy retention code. Package delivered within revised 24h window."
+  },
+  {
+    "source_id": "olist-case-7830",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_7830",
+    "title": "Caxias do Sul RS heavy freight machinery delay to Recife PE",
+    "version": "2026.2",
+    "metadata": {"category": "automotivo", "seller_state": "RS", "customer_state": "PE", "order_value": 890.00},
+    "text": "Historical Olist case: automotive replacement parts shipped from southern Brazil (RS) to Northeast (PE) faced highway checkpoint delays. Triggered POL_REGIONAL_LOGISTICS_06. Operations approved expedited air-line transfer with Jadlog and issued BRL 30.00 store credit, converting potential churn into a 5-star review."
+  },
+  {
+    "source_id": "olist-case-3104",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_3104",
+    "title": "Franca SP footwear fulfillment delay to Goiânia GO",
+    "version": "2026.2",
+    "metadata": {"category": "calcados_moda", "seller_state": "SP", "customer_state": "GO", "order_value": 310.00},
+    "text": "Historical Olist case: footwear order dispatched by Total Express was delayed by sorting machine maintenance in central Brazil. Operations approved proactive status notification to buyer with revised 36-hour delivery window and BRL 20.00 discount voucher for subsequent purchases."
+  },
+  {
+    "source_id": "olist-case-6019",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_6019",
+    "title": "Rio de Janeiro RJ coastal storm courier delivery exception",
+    "version": "2026.2",
+    "metadata": {"category": "beleza_saude", "seller_state": "SP", "customer_state": "RJ", "order_value": 149.00},
+    "text": "Historical Olist case: severe weather disrupted last-mile courier delivery in Rio de Janeiro. Evidence agent verified weather alert and updated SLA date. Customer was sent proactive weather delay notification with priority dispatch reassurance, maintaining zero escalation to marketplace disputes."
+  },
+  {
+    "source_id": "olist-case-8842",
+    "source_type": "historical_case",
+    "case_id": "CASE_HIST_8842",
+    "title": "Porto Alegre RS cross-state courier transfer exception to Brasília DF",
+    "version": "2026.2",
+    "metadata": {"category": "ferramentas_jardim", "seller_state": "RS", "customer_state": "DF", "order_value": 450.00},
+    "text": "Historical Olist case: high-demand garden tools package held in interstate transit hub. Policy POL_CARRIER_ESCALATION_01 applied. Priority carrier ping expedited package movement within 6 hours, preventing SLA breach."
   }
 ]

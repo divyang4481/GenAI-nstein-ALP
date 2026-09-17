@@ -189,6 +189,12 @@ async def submit_human_decision(
     incident.reviewer_notes = reviewer_notes
     incident.resolved_at = datetime.datetime.utcnow()
 
+    if decision == "APPROVED":
+        order_res = await db.execute(select(OrderModel).where(OrderModel.order_id == incident.order_id))
+        order_obj = order_res.scalars().first()
+        if order_obj:
+            order_obj.is_at_risk = False
+
     # Approval records authorisation only. No external connector is invoked.
     action = ActionLedgerModel(
         action_id=f"ACT-{uuid.uuid4().hex[:10].upper()}",

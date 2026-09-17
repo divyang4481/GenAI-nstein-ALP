@@ -18,62 +18,82 @@ graph LR
 
 ---
 
-## 2. High-Level System Architecture
+## 2. System Component & MCP Integration Architecture
 
 ```mermaid
-flowchart TB
-    subgraph ClientLayer ["1. Presentation & Interaction Layer"]
-        UI["React + Vite UI Dashboard<br/>(Case Workspace, Replay Stream, Case Q&A)"]
-        Console["Operations Console<br/>(Human-in-the-Loop Decision Engine)"]
-    end
-
-    subgraph APILayer ["2. Orchestration & Backend Service"]
-        FastAPI["FastAPI Backend Service<br/>(backend/app/main.py)"]
-        Orchestrator["Agent Workflow Orchestrator<br/>(backend/app/agents/orchestrator.py)"]
-        LLMProvider["LLM Provider & Router<br/>(backend/app/agents/llm_provider.py)"]
-    end
-
-    subgraph AgentsLayer ["3. Specialized Multi-Agent Team"]
-        A1["1. Delivery Risk Agent<br/>(Risk Scoring & Delay Assessment)"]
-        A2["2. Evidence Retrieval Agent<br/>(Order, Carrier & Seller Inspection)"]
-        A3["3. Policy Retrieval Agent<br/>(RAG Knowledge Search)"]
-        A4["4. Recovery Action Agent<br/>(Compensation & Communication Drafting)"]
-        A5["5. Safety & Guardrail Agent<br/>(Compliance & Financial Limit Checks)"]
-    end
-
-    subgraph MCPLayer ["4. Model Context Protocol (MCP) Server"]
-        MCPServer["MCP Tool Server (FastMCP / Port 8001)<br/>(mcp-server/app.py)"]
-        T1["get_order_details"]
-        T2["get_seller_reliability"]
-        T3["get_tracking_history"]
-        T4["search_policies_rag"]
-    end
-
-    subgraph DataIntelligenceLayer ["5. Data & AI Foundation"]
-        Bedrock["AWS Bedrock<br/>(Amazon Nova Lite / Claude 3.5 Sonnet)"]
-        Qdrant[("Qdrant Vector Database<br/>(Collections: retailflow_knowledge)")]
-        Postgres[("PostgreSQL Database<br/>(Olist Orders, Customers, Traces)")]
-    end
-
-    %% Wiring
-    UI -->|REST API / WebSocket| FastAPI
-    Console -->|Approve / Modify / Reject| FastAPI
-    FastAPI --> Orchestrator
-    Orchestrator --> A1 & A2 & A3 & A4 & A5
-
-    A1 -->|Risk Prompt| LLMProvider
-    A2 -->|Tool Calls| MCPServer
-    A3 -->|RAG Vector Query| MCPServer
-    A4 -->|Draft Generation| LLMProvider
-    A5 -->|Safety Verification| LLMProvider
-
-    MCPServer --> T1 & T2 & T3 & T4
-    T1 & T2 & T3 --> Postgres
-    T4 --> Qdrant
-
-    LLMProvider -->|boto3 API (profile: divyang)| Bedrock
-
-    A5 -.->|Synthesized Case Package| Console
+graph TB 
+    subgraph Frontend_Client ["Frontend Client: Operations Control Tower (React 19 + Vite)"] 
+        UI_Header["Header & Replay Toolbar<br/>(Speed, Pause, Bedrock Status)"] 
+        UI_Ribbon["Metrics Ribbon<br/>(At-Risk Orders, Value Protected)"] 
+        UI_Queue["Live Risk Work Queue<br/>(Priority Ranked SLA Items)"] 
+        UI_Workspace["Case Workspace & HITL Console<br/>(Action Brief, Decision Buttons)"] 
+        UI_Inspector["Agent Trace Inspector<br/>(Thoughts, MCP Tool I/O, Latency)"] 
+        UI_Modals["Architecture & Evaluation Modals<br/>(AWS Topology, Ground Truth Test)"] 
+    end 
+ 
+    subgraph API_Gateway_Layer ["FastAPI Ingestion & Web Server"] 
+        Router_HTTP["REST API Endpoints<br/>(/api/orders, /api/incidents, /api/metrics)"] 
+        WS_Manager["WebSocket Manager (/ws)<br/>(Real-Time Event Broadcast)"] 
+        Engine_Replay["Replay Engine<br/>(Olist Brazilian Dataset Stream)"] 
+    end 
+ 
+    subgraph Agentic_Orchestration ["Autonomous Multi-Agent Investigation Engine"] 
+        Orchestrator["MultiAgentOrchestrator<br/>(State Coordination & Idempotency)"] 
+        Agent_Risk["1. Delivery-Risk Agent<br/>(SLA Burn Rate & Risk Heuristic)"] 
+        Agent_Evidence["2. Evidence Agent<br/>(Root-Cause Correlation)"] 
+        Agent_Policy["3. Policy & RAG Agent<br/>(Playbook Rule Grounding)"] 
+        Agent_Recovery["4. Recovery Agent<br/>(Brief & Draft Synthesis)"] 
+        Agent_Guardrail["5. Enterprise Guardrail Agent<br/>(Safety & Boundary Enforcement)"] 
+    end 
+ 
+    subgraph Tool_Protocol ["Model Context Protocol (MCP) Tool Server"] 
+        MCP_Exec["MCPToolExecutor"] 
+        T_Order["getOrder()"] 
+        T_Seller["getSellerHistory()"] 
+        T_Cases["findSimilarCases()"] 
+        T_Policy["getPolicy()"] 
+        T_CaseCreate["createCase()"] 
+        T_Carrier["escalateCarrier()"] 
+        T_Comms["draftCustomerMessage()"] 
+    end 
+ 
+    subgraph Foundation_Models ["Inference Gateway"] 
+        LLM_Provider["LLMProvider Router"] 
+        Bedrock["Amazon Bedrock Runtime<br/>(us.amazon.nova-lite-v1:0 / nova-pro)"] 
+        Fallback["Deterministic Safe Fallback<br/>(Circuit Breaker Mode)"] 
+    end 
+ 
+    subgraph Data_Storage ["Data Tier & Audit Store"] 
+        DB_Orders[("Orders Store<br/>OrderModel")] 
+        DB_Sellers[("Seller History<br/>SellerHistoryModel")] 
+        DB_Policies[("Policy Playbooks<br/>PolicyPlaybookModel")] 
+        DB_Incidents[("Incidents Ledger<br/>IncidentModel")] 
+        DB_Traces[("Agent Execution Traces<br/>AgentTraceModel")] 
+        DB_Ledger[("Immutable Audit Ledger<br/>ActionLedgerModel")] 
+    end 
+ 
+    %% Connections 
+    Frontend_Client <==>|Duplex WebSockets & REST| API_Gateway_Layer 
+    Engine_Replay -->|Stream Events| WS_Manager 
+    Engine_Replay -->|Trigger High Risk| Orchestrator 
+    Router_HTTP -->|Invokes| Orchestrator 
+ 
+    Orchestrator --> Agent_Risk 
+    Agent_Risk --> Agent_Evidence 
+    Agent_Evidence --> Agent_Policy 
+    Agent_Policy --> Agent_Recovery 
+    Agent_Recovery --> Agent_Guardrail 
+ 
+    Agent_Risk & Agent_Evidence & Agent_Policy & Agent_Recovery & Agent_Guardrail -->|Tool Calls| MCP_Exec 
+    MCP_Exec --> T_Order & T_Seller & T_Cases & T_Policy & T_CaseCreate & T_Carrier & T_Comms 
+ 
+    Agent_Risk & Agent_Evidence & Agent_Policy & Agent_Recovery & Agent_Guardrail -->|Generate Thought / Brief| LLM_Provider 
+    LLM_Provider --> Bedrock 
+    LLM_Provider -.->|If AWS Offline| Fallback 
+ 
+    MCP_Exec <-->|Read / Query| DB_Orders & DB_Sellers & DB_Policies 
+    Orchestrator -->|Write Traces & Incidents| DB_Incidents & DB_Traces 
+    Router_HTTP -->|Record Human Approval| DB_Ledger 
 ```
 
 ---
@@ -112,87 +132,92 @@ flowchart TD
 
 ---
 
-## 5. End-to-End Execution Sequence Diagram
+## 5. End-to-End Logical Flow & Multi-Agent A2A Sequence
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Specialist as Operations Specialist
-    participant UI as React Frontend
-    participant FastAPI as FastAPI Backend
-    participant Orch as Workflow Orchestrator
-    participant MCP as MCP Tool Server (Port 8001)
-    participant Postgres as PostgreSQL DB
-    participant Qdrant as Qdrant Vector DB
-    participant Bedrock as AWS Bedrock (Nova Lite)
-
-    Specialist->>UI: Select Case / Click "Start Agent Investigation"
-    UI->>FastAPI: POST /api/cases/{order_id}/investigate
-    FastAPI->>Orch: execute_investigation_cycle(order_id)
-
-    %% Step 1 & 2: Risk Calculation
-    rect rgb(240, 249, 255)
-    Note over Orch,Bedrock: 1. Risk Evaluation Stage
-    Orch->>MCP: call_tool("get_order_details", {order_id})
-    MCP->>Postgres: SELECT * FROM olist_orders WHERE order_id = :id
-    Postgres-->>MCP: Order Record & Delivery Timestamps
-    MCP-->>Orch: Order Details
-    Orch->>Bedrock: Prompt Delivery Risk Agent (Delay, Value, Carrier History)
-    Bedrock-->>Orch: Risk: 0.85 (HIGH), Risk Factors: ["Transit delay > 72h", "High-value item"]
-    Orch->>Postgres: INSERT INTO agent_traces (Agent 1: Risk Assessment)
-    end
-
-    %% Step 3: Evidence Retrieval
-    rect rgb(240, 253, 244)
-    Note over Orch,Postgres: 2. Evidence Gathering via MCP
-    Orch->>MCP: call_tool("get_seller_reliability", {seller_id})
-    MCP->>Postgres: Query seller on-time delivery & review ratings
-    Postgres-->>MCP: Rating: 4.8/5, On-Time: 96%
-    MCP-->>Orch: Seller Track Record (Tier A)
-    Orch->>MCP: call_tool("get_tracking_history", {order_id})
-    MCP->>Postgres: Query shipment checkpoints
-    Postgres-->>MCP: Checkpoint: Package stuck at distribution hub
-    MCP-->>Orch: Tracking Breakdown
-    Orch->>Postgres: INSERT INTO agent_traces (Agent 2: Evidence Compiled)
-    end
-
-    %% Step 4: Policy Retrieval (RAG)
-    rect rgb(254, 252, 232)
-    Note over Orch,Qdrant: 3. Policy Retrieval via Vector RAG
-    Orch->>MCP: call_tool("search_policies_rag", {query: "Delay > 3 days Tier A seller compensation"})
-    MCP->>Qdrant: Vector similarity search (Cosine metric)
-    Qdrant-->>MCP: Returns Chunks: POL-002 ($15 max voucher), POL-004 (Carrier SLA escalation)
-    MCP-->>Orch: Authoritative Policy Chunks & Rules
-    Orch->>Postgres: INSERT INTO agent_traces (Agent 3: Policy Retrieval)
-    end
-
-    %% Step 5: Draft Recovery Plan
-    rect rgb(254, 242, 242)
-    Note over Orch,Bedrock: 4. Draft Recovery Plan
-    Orch->>Bedrock: Prompt Recovery Agent (Synthesize Evidence + Policy + Customer Context)
-    Bedrock-->>Orch: Recovery Plan: Priority Carrier Dispatch + $10 Courtesy Credit + Apology Draft
-    Orch->>Postgres: INSERT INTO agent_traces (Agent 4: Recovery Draft)
-    end
-
-    %% Step 6: Guardrail Validation
-    rect rgb(250, 245, 255)
-    Note over Orch,Bedrock: 5. Safety & Guardrail Check
-    Orch->>Bedrock: Prompt Guardrail Agent (Verify $10 <= $15 cap, check tone & PII)
-    Bedrock-->>Orch: Status: PASSED (Zero policy violations, verified compliant)
-    Orch->>Postgres: INSERT INTO agent_traces (Agent 5: Guardrail Check)
-    end
-
-    %% Step 7: Human Decision
-    rect rgb(255, 251, 235)
-    Note over Orch,Specialist: 6. Human-in-the-Loop Decision Console
-    Orch-->>FastAPI: Complete Investigation Payload (5 Traces, Risk, Plan, Email)
-    FastAPI-->>UI: Real-time update (WebSocket / REST Response)
-    UI-->>Specialist: Render Visual Timeline, Risk Gauge, Policy Cards & Drafted Action
-    Specialist->>UI: Review recommendations and click "Approve Action"
-    UI->>FastAPI: POST /api/cases/{order_id}/resolve {status: "APPROVED"}
-    FastAPI->>Postgres: UPDATE incidents SET status = 'RESOLVED'
-    FastAPI-->>UI: Action Confirmed & Incident Closed
-    end
+sequenceDiagram 
+    autonumber 
+    actor Ops as Human Operations Specialist 
+    participant Replay as Replay Engine (Olist Stream) 
+    participant WS as WebSocket Hub (/ws) 
+    participant Orch as MultiAgentOrchestrator 
+    participant Risk as Delivery-Risk Agent 
+    participant Evid as Evidence Agent 
+    participant Pol as Policy & RAG Agent 
+    participant Rec as Recovery Agent 
+    participant Guard as Enterprise Guardrail Agent 
+    participant MCP as MCP Tool Executor 
+    participant DB as Relational Store (PostgreSQL / SQLite) 
+    participant Ledger as Action Execution Ledger 
+ 
+    Replay->>WS: Broadcast ORDER_EVENT_EMITTED (transit status / SLA countdown) 
+    Note over Replay,Orch: Trigger when risk_score >= 0.65 and SLA expiring < 24h 
+    Replay->>Orch: run_investigation(order_id) 
+     
+    %% Step 1: Risk Agent 
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 1: Delivery-Risk) 
+    Orch->>Risk: evaluate(order_id) 
+    Risk->>MCP: execute("getOrder", {order_id}) 
+    MCP->>DB: Query OrderModel 
+    DB-->>MCP: Live order metadata & corridor state 
+    MCP-->>Risk: Order payload 
+    Risk->>Risk: Analyze SLA burn rate & transit bottlenecks 
+    Risk-->>Orch: Risk Score (0.88 CRITICAL), Primary Factor 
+    Orch->>DB: Persist Step 1 AgentTraceModel 
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Risk Trace) 
+ 
+    %% Step 2: Evidence Agent 
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 2: Evidence) 
+    Orch->>Evid: gather(order_data, risk_data) 
+    Evid->>MCP: execute("getSellerHistory", {seller_id}) 
+    MCP->>DB: Query SellerHistoryModel 
+    DB-->>MCP: Late order rate (17.0%), 3 recent exceptions 
+    Evid->>MCP: execute("findSimilarCases", {category, state}) 
+    MCP-->>Evid: Historical corridor resolution benchmarks 
+    Evid-->>Orch: Synthesized Factual Evidence Brief 
+    Orch->>DB: Persist Step 2 AgentTraceModel 
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Evidence Trace) 
+ 
+    %% Step 3: Policy Agent 
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 3: Policy & RAG) 
+    Orch->>Pol: check_policies(evidence, risk) 
+    Pol->>MCP: execute("getPolicy", {category: "CARRIER_ESCALATION"}) 
+    MCP->>DB: Query PolicyPlaybookModel 
+    DB-->>MCP: POL_CARRIER_ESCALATION_01, POL_CUSTOMER_PROACTIVE_COMMS_02 
+    Pol-->>Orch: Permitted actions, Prohibited actions, Voucher cap (R$ 25) 
+    Orch->>DB: Persist Step 3 AgentTraceModel 
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Policy Trace) 
+ 
+    %% Step 4: Recovery Agent 
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 4: Recovery) 
+    Orch->>Rec: draft_recovery(order, evidence, policy) 
+    Rec->>MCP: execute("escalateCarrier", {carrier, priority: "PRIORITY_1"}) 
+    MCP-->>Rec: Draft ticket (TKT-CARRIER-8F3E2B-99) 
+    Rec->>MCP: execute("draftCustomerMessage", {order_id, voucher: 20.00}) 
+    MCP-->>Rec: Drafted customer communication 
+    Rec-->>Orch: Executive Action Brief & Proposed Action Payload 
+    Orch->>DB: Persist Step 4 AgentTraceModel 
+    Orch->>WS: Broadcast AGENT_STEP_COMPLETED (Recovery Trace) 
+ 
+    %% Step 5: Guardrail Agent 
+    Orch->>WS: Broadcast AGENT_STEP_STARTED (Step 5: Guardrail) 
+    Orch->>Guard: validate(recovery_plan, policy_bounds) 
+    Guard->>Guard: Verify NO_AUTONOMOUS_REFUND (Passed) 
+    Guard->>Guard: Verify NO_DIRECT_COMMS_WITHOUT_SIGN_OFF (Passed) 
+    Guard->>Guard: Verify VOUCHER <= R$ 25.00 Cap (R$ 20.00 <= 25.00 Passed) 
+    Guard-->>Orch: Guardrail Verdict: PASSED 
+    Orch->>DB: Persist Step 5 AgentTraceModel 
+    Orch->>DB: Create IncidentModel (status: "PENDING_REVIEW") 
+    Orch->>WS: Broadcast INCIDENT_DISPATCHED_FOR_APPROVAL 
+ 
+    %% Human-in-the-loop Decision 
+    WS-->>Ops: Push pending incident to Work Queue 
+    Ops->>Ops: Inspect AI traces, seller history, and policy citations 
+    Ops->>Orch: POST /api/incidents/{id}/decision ("APPROVED", reviewer_notes) 
+    Orch->>DB: Update IncidentModel (status: "APPROVED") 
+    Orch->>Ledger: Insert ActionLedgerModel (immutable audit record) 
+    Orch->>WS: Broadcast HITL_DECISION_RECORDED 
+    WS-->>Ops: Update KPI Ribbon & Execution Log 
 ```
 
 ---
@@ -338,6 +363,46 @@ erDiagram
 
 ## 9. Security, Governance & Deployment Topology
 
+### Local MVP vs. Enterprise AWS Cloud Topology
+
+```mermaid
+flowchart LR 
+    subgraph Local_Container_MVP ["Local MVP (Docker / Developer Environment)"] 
+        L_Replay["Async Python Replay Engine<br/>(Simulated Olist Events)"] 
+        L_FastAPI["FastAPI Uvicorn Process<br/>(REST API + In-Process WS)"] 
+        L_Orch["Sequential Asyncio Orchestrator<br/>(Local Python Process)"] 
+        L_MCP["Local MCP Tool Executor<br/>(Direct DB Select Calls)"] 
+        L_Bedrock["AWS Boto3 Client<br/>(Direct SDK Invocation)"] 
+        L_DB["SQLite / aiosqlite File<br/>(retailflow.db)"] 
+        L_Ledger["ActionLedger Table<br/>(SQLite In-Database Table)"] 
+        L_UI["React 19 + Vite Dev Server<br/>(Port 5173)"] 
+    end 
+ 
+    subgraph AWS_Production_Enterprise ["AWS Production Target Topology"] 
+        P_Kinesis["Amazon Kinesis Data Streams / MSK<br/>(Partitioned Marketplace Event Bus)"] 
+        P_ECS["AWS ECS Fargate / Lambda<br/>(Auto-Scaling Container Tasks)"] 
+        P_Step["AWS Step Functions / Temporal<br/>(Durable Distributed Workflow)"] 
+        P_MCP["MCP Service over API Gateway / mTLS<br/>(Microservice Tool Server)"] 
+        P_Bedrock["Amazon Bedrock Private Link<br/>(Nova Lite / Claude 3.5 Sonnet)"] 
+        P_RDS["Amazon RDS PostgreSQL Multi-AZ<br/>(Orders, Incidents, SLA State)"] 
+        P_Vector["Amazon OpenSearch Serverless<br/>(Policy & Case Chunk Vector Store)"] 
+        P_Dynamo["Amazon DynamoDB + CloudWatch<br/>(WORM Compliant Immutable Ledger)"] 
+        P_CloudFront["CloudFront CDN + S3 Bucket<br/>(Static React Single Page App)"] 
+        P_APIGW["Amazon API Gateway WebSocket API<br/>(Managed Persistent Duplex Fleet)"] 
+    end 
+ 
+    L_Replay ====>|Production Migration| P_Kinesis 
+    L_FastAPI ====>|Containerization| P_ECS 
+    L_FastAPI ====>|Managed Real-Time| P_APIGW 
+    L_Orch ====>|Durable State Machine| P_Step 
+    L_MCP ====>|Decoupled Tool Services| P_MCP 
+    L_Bedrock ====>|VPC Private Endpoint| P_Bedrock 
+    L_DB ====>|Enterprise Relational Store| P_RDS 
+    L_DB ====>|Semantic Knowledge Embeddings| P_Vector 
+    L_Ledger ====>|Tamper-Proof Audit Store| P_Dynamo 
+    L_UI ====>|Edge Distribution| P_CloudFront 
+```
+
 ### Deployment Matrix
 | Service | Container Name | Port | Base Image | Purpose |
 |---|---|---|---|---|
@@ -352,6 +417,44 @@ erDiagram
 2. **Deterministic Financial Caps**: Guardrails enforce strict policy maximums (e.g., voucher <= $15) at the code level, preventing LLM over-compensation.
 3. **Audit Trail**: 100% of agent reasoning chains, tool inputs/outputs, latencies, and human decision logs are recorded in PostgreSQL `agent_traces`.
 4. **Credential Isolation**: Temporary AWS session credentials (`AWS_SESSION_TOKEN`) are injected into runtime containers without baking permanent keys into Docker images.
+
+### Dual-Phase Guardrail & Responsible AI Architecture
+
+```mermaid
+flowchart TD 
+    subgraph Ingestion_And_Drafting ["Phase 1: Agent Reasoning & Draft Generation"] 
+        OrderInput["High-Risk Order Event"] --> RiskCalc["Delivery-Risk Agent<br/>(Calculate Delay Likelihood)"] 
+        RiskCalc --> MCPQuery["MCP Tool Data Aggregation<br/>(Seller Track Record + Playbooks)"] 
+        MCPQuery --> RecoveryDraft["Recovery Agent<br/>(Synthesize Carrier Ticket & Customer Notice)"] 
+    end 
+ 
+    subgraph Deterministic_Guardrail_Engine ["Phase 2: Enterprise Guardrail Agent (Hard-Coded Enforcers)"] 
+        RecoveryDraft --> Rule1{"Rule 1: Autonomous Refund?<br/>NO_AUTONOMOUS_REFUND"} 
+        Rule1 -- Yes: Violates Safety --> Reject1["BLOCK ACTION<br/>Set Guardrail Status: REJECTED"] 
+        Rule1 -- No: Passed --> Rule2{"Rule 2: Direct Customer Comm?<br/>NO_AUTONOMOUS_CUSTOMER_PROMISE"} 
+         
+        Rule2 -- Unapproved Direct Push --> Reject2["BLOCK ACTION<br/>Force Draft-Only State"] 
+        Rule2 -- Confined to Draft --> Rule3{"Rule 3: Compensation Voucher?<br/>VOUCHER_POLICY_CAP_CHECK"} 
+         
+        Rule3 -- Proposed > R$ 25.00 Cap --> Reject3["BLOCK ACTION<br/>Cap Exceeded Exception"] 
+        Rule3 -- Proposed <= R$ 25.00 Cap --> Rule4{"Rule 4: PII Masking & Schema?<br/>STRUCTURED_SCHEMA_VALIDITY"} 
+         
+        Rule4 -- Invalid Schema --> Reject4["BLOCK ACTION<br/>Format Discrepancy"] 
+        Rule4 -- Verified Clean --> AllPassed["GUARDRAIL STATUS: PASSED<br/>Generate Audit Token"] 
+    end 
+ 
+    subgraph Human_In_The_Loop_Gate ["Phase 3: Operations Specialist Authorization"] 
+        AllPassed --> WorkQueue["Dispatched to Work Queue<br/>Status: PENDING_REVIEW"] 
+        WorkQueue --> HITLView["Human Operations Reviewer Console<br/>(Inspect Evidence, Corridor, Citations)"] 
+        HITLView --> Decision{"Operations Decision"} 
+         
+        Decision -- Reject Plan --> AuditReject["Record Status: REJECTED<br/>Log Reviewer Notes in Ledger"] 
+        Decision -- Approve Plan --> ExecuteAction["Execute Carrier Priority Dispatch<br/>Send Customer Goodwill Voucher"] 
+        ExecuteAction --> AuditApproved["Insert ActionLedgerModel<br/>(Record Correlation ID, Signer, Timestamp)"] 
+    end 
+ 
+    Reject1 & Reject2 & Reject3 & Reject4 --> AlertOps["Alert Compliance Tower<br/>Log Security Incident in Audit Trail"] 
+```
 
 ---
 

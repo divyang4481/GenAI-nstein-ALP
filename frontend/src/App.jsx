@@ -186,12 +186,13 @@ export default function App() {
     setIsSubmitting(true);
     try {
       await submitDecision(incidentId, decision, reviewerNotes, reviewerName);
+      const newStatus = decision === "APPROVED" ? "APPROVED_FOR_EXECUTION" : "REJECTED";
       if (activeIncident) {
         setActiveIncident(prev => ({
           ...prev,
-          status: decision,
+          status: newStatus,
           resolution_decision: decision,
-          reviewer_notes: reviewerNotes
+          reviewer_notes: reviewerNotes || (decision === "APPROVED" ? "Verified and approved by Operations Supervisor." : "Rejected by reviewer.")
         }));
       }
       const [updatedIncidents, updatedLedger, updatedMetrics] = await Promise.all([
@@ -200,6 +201,10 @@ export default function App() {
         fetchMetrics()
       ]);
       setIncidents(updatedIncidents);
+      const freshActive = updatedIncidents.find(i => i.incident_id === incidentId);
+      if (freshActive) {
+        setActiveIncident(freshActive);
+      }
       setAuditLedger(updatedLedger);
       setMetrics(updatedMetrics);
     } catch (e) {
@@ -275,6 +280,7 @@ export default function App() {
           <div>
             <LiveEventStream
               orders={orders}
+              incidents={incidents}
               events={events}
               selectedOrderId={selectedOrderId}
               onSelectOrder={handleSelectOrder}

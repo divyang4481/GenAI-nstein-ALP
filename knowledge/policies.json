@@ -3,36 +3,72 @@
     "source_id": "policy-carrier-escalation-01",
     "source_type": "policy",
     "policy_id": "POL_CARRIER_ESCALATION_01",
-    "title": "Carrier escalation and late-delivery recovery",
-    "version": "2026.1",
-    "metadata": {"max_voucher_brl": 25.0, "currency": "BRL"},
-    "text": "For an in-transit order at high risk of missing its promised SLA date (<24h SLA remaining or transit bottleneck), operations may prepare a priority carrier escalation draft. The escalation must not be submitted until an authorised operations reviewer approves it. A goodwill voucher draft may be proposed up to BRL 25.00. Automatic refunds and money movement are strictly prohibited in the autonomous agent workflow. Customer messages must remain drafts and must not be sent automatically. Cite this policy version in the audit record."
+    "title": "Carrier Escalation & High-Priority In-Transit SLA Recovery",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 25.0, "currency": "BRL", "category": "CARRIER_ESCALATION"},
+    "text": "For an in-transit order at high risk of missing its promised SLA delivery date (<24h SLA remaining or persistent distribution hub bottleneck), operations may prepare an expedited priority carrier escalation draft across 3PL partners (Correios SEDEX, Correios PAC, Total Express, Loggi, Jadlog). The escalation request must not be dispatched externally until an authorized operations supervisor reviews and approves the dossier. A courtesy goodwill voucher draft may be proposed up to BRL 25.00 for delays exceeding 48 hours. Automatic refunds and external automated financial transfers are strictly prohibited in the autonomous agent workflow. Customer messages must remain in draft state. Cite this policy in the audit trail."
   },
   {
     "source_id": "policy-customer-comms-02",
     "source_type": "policy",
     "policy_id": "POL_CUSTOMER_PROACTIVE_COMMS_02",
-    "title": "Proactive customer communications and goodwill credit",
-    "version": "2026.1",
-    "metadata": {"max_voucher_brl": 20.0, "currency": "BRL"},
-    "text": "RetailFlow may draft an empathetic delivery update when evidence indicates likely delay exceeding 24 hours. The draft may include a revised delivery estimate supported by carrier tracking evidence. A customer retention credit of up to BRL 20.00 is permitted subject to supervisor sign-off. External delivery, email, SMS, WhatsApp, direct CRM contact, and financial promises require explicit human approval and a separate connector. The autonomous agent is advisory and cannot send messages directly."
+    "title": "Proactive Customer Delivery Status Updates & Retention Credits",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 20.0, "currency": "BRL", "category": "CUSTOMER_COMMS"},
+    "text": "RetailFlow AI may formulate an empathetic proactive customer delivery update draft when tracking telematics or route congestion models indicate an unavoidable delay exceeding 24 hours. The notification draft must provide a transparent explanation, a revised delivery estimate backed by carrier checkpoint evidence, and may propose a store credit voucher up to BRL 20.00 subject to operations sign-off. Direct outbound messaging (SMS, WhatsApp, CRM push, Email) requires human approval prior to transmission. Autonomous agents operate in an advisory and drafting capacity."
   },
   {
     "source_id": "policy-seller-dispatch-03",
     "source_type": "policy",
     "policy_id": "POL_SELLER_DISPATCH_DELAY_03",
-    "title": "Chronic Late Seller Dispatch Intervention and Remediation",
-    "version": "2026.1",
-    "metadata": {"max_voucher_brl": 35.0, "currency": "BRL"},
-    "text": "If a seller exhibits dispatch elapsed time exceeding 48 hours or historical late dispatch rate >= 15% with recent exceptions >= 3, operations is permitted to prepare a priority merchant warning, request express pickup dispatch, or reallocate inventory. Goodwill compensation up to BRL 35.00 may be proposed for affected buyers. Permanent merchant bans without audit are prohibited."
+    "title": "Chronic Late Seller Dispatch Intervention & Merchant SLAs",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 35.0, "currency": "BRL", "category": "MERCHANT_SLA"},
+    "text": "When marketplace seller dispatch elapsed time exceeds 48 hours, or when a seller has a historical late dispatch rate >= 15% with >= 3 recent delivery exceptions, operations is authorized to draft a high-priority merchant warning, request an express courier pickup, or initiate proactive inventory reallocation from alternative regional fulfillment centers. Goodwill compensation up to BRL 35.00 may be proposed for severely delayed buyers. Arbitrary seller bans without complete audit review are strictly prohibited."
   },
   {
     "source_id": "policy-guardrail-governance-04",
     "source_type": "policy",
     "policy_id": "POL_GUARDRAIL_GOVERNANCE_04",
-    "title": "Enterprise Responsible AI and Guardrail Governance",
-    "version": "2026.1",
-    "metadata": {"currency": "BRL"},
-    "text": "All autonomous agent recommendations must pass deterministic enterprise safety checks before being presented to operators. Strict boundaries enforce: (1) Prompt injection defense (hidden or override instructions are rejected), (2) Supported draft action types only, (3) Mandatory Human-in-the-Loop approval for external actions, (4) Strict monetary caps in Brazilian Reais (BRL), and (5) Audit logging of all tool invocations and model inference reasoning."
+    "title": "Enterprise Responsible AI & Deterministic Guardrail Governance",
+    "version": "2026.2",
+    "metadata": {"currency": "BRL", "category": "GOVERNANCE"},
+    "text": "All autonomous agent recommendations must pass deterministic safety and compliance checks before presentation to operations specialists. Five mandatory guardrails apply: (1) Prompt injection and override defense — any request attempting to bypass policy rules is rejected, (2) Supported action types only — recovery plans must conform to standard operations taxonomies, (3) Mandatory Human-in-the-Loop approval for external actions, (4) Strict monetary caps in Brazilian Reais (BRL), and (5) Complete trace logging of all agent thoughts, tool inputs, outputs, token usage, and latency."
+  },
+  {
+    "source_id": "policy-transit-damage-loss-05",
+    "source_type": "policy",
+    "policy_id": "POL_TRANSIT_DAMAGE_LOSS_05",
+    "title": "In-Transit Stalled Checkpoints & Lost Parcel Resolution",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 50.0, "currency": "BRL", "category": "TRANSIT_LOSS"},
+    "text": "If an order in transit experiences zero checkpoint scan updates for greater than 72 consecutive hours during national line-haul transport, the system flags the shipment as potentially stalled or lost. The Recovery Agent is authorized to draft a Carrier Investigation Inquiry (PI - Pedido de Informação) and formulate a priority re-shipment or store credit draft up to BRL 50.00 for the customer, contingent upon formal supervisor approval and carrier loss confirmation."
+  },
+  {
+    "source_id": "policy-regional-logistics-06",
+    "source_type": "policy",
+    "policy_id": "POL_REGIONAL_LOGISTICS_06",
+    "title": "Brazilian Regional Logistics Corridor Contingency Rules",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 30.0, "currency": "BRL", "category": "REGIONAL_CORRIDOR"},
+    "text": "Shipments traversing specialized regional corridors — specifically North region riverine transport (Amazonas/Pará), interstate line-hauls between Southeast (SP/RJ) and Northeast (BA/PE/CE), and Southern winter cross-docks (PR/SC/RS) — are subject to weather and infrastructure contingency SLA buffers. For severe corridor delays, operations may authorize dedicated 3PL transfers or priority air-freight routing with courtesy retention vouchers up to BRL 30.00."
+  },
+  {
+    "source_id": "policy-customer-retention-tiers-07",
+    "source_type": "policy",
+    "policy_id": "POL_CUSTOMER_RETENTION_TIERS_07",
+    "title": "Customer Lifetime Value & Tiered Compensation Matrix",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 40.0, "currency": "BRL", "category": "CUSTOMER_TIERS"},
+    "text": "Customer goodwill compensation is tiered based on order value and customer tier: Standard Tier (Order < BRL 150): Maximum voucher BRL 15.00; Silver Tier (Order BRL 150 - 500): Maximum voucher BRL 25.00; Gold / VIP Tier (Order > BRL 500 or repeat customer): Maximum voucher BRL 40.00 with personalized executive outreach draft. All voucher recommendations must align with verified SLA breach severity and require supervisor authorization."
+  },
+  {
+    "source_id": "policy-high-value-security-08",
+    "source_type": "policy",
+    "policy_id": "POL_HIGH_VALUE_SECURITY_08",
+    "title": "High-Value Order Security & Anti-Fraud Delivery Protocol",
+    "version": "2026.2",
+    "metadata": {"max_voucher_brl": 0.0, "currency": "BRL", "category": "SECURITY"},
+    "text": "Orders exceeding BRL 1,000.00 (e.g. high-end electronics, smartphones, watches) require enhanced carrier custody validation. When delivery exceptions occur on high-value orders, address modifications or automated cancellations are prohibited. Operations must mandate carrier signature confirmation (AR - Aviso de Recebimento) and verify recipient identity before releasing replacement goods or approving goodwill compensations."
   }
 ]
