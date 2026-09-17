@@ -8,14 +8,13 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     DATABASE_URL: str = "sqlite+aiosqlite:///./retailflow.db"
     
-    # LLM Settings (Default: local Ollama for real local AI reasoning!)
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")  # ollama, gemini, bedrock, openai, mock
+    # LLM Settings (Default: AWS Bedrock or Local Ollama)
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "bedrock")  # bedrock, ollama, gemini, openai, mock
+    BEDROCK_MODEL: str = os.getenv("BEDROCK_MODEL", "us.amazon.nova-pro-v1:0")
+    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
+    
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:latest")
-    
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
-    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
     
     # Event Replay Engine
     REPLAY_INTERVAL_SECONDS: float = float(os.getenv("REPLAY_INTERVAL_SECONDS", "1.5"))

@@ -63,10 +63,11 @@ async def get_llm_status():
     return llm_provider.get_status()
 
 @app.post("/api/llm/select")
-async def select_llm_model(payload: Dict[str, str] = Body(...)):
-    model_name = payload.get("model", "llama3.1:latest")
-    llm_provider.set_model(model_name)
-    return {"status": "SUCCESS", "active_model": llm_provider.ollama_model}
+async def select_llm_model(payload: Dict[str, Any] = Body(...)):
+    model_name = payload.get("model", "us.amazon.nova-pro-v1:0")
+    provider = payload.get("provider")
+    llm_provider.set_model(model_name, provider=provider)
+    return {"status": "SUCCESS", "active_model": llm_provider.bedrock_model if llm_provider.provider == "bedrock" else llm_provider.ollama_model, "provider": llm_provider.provider}
 
 @app.get("/api/mcp/manifest")
 async def get_mcp_manifest():

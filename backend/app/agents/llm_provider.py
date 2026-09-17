@@ -2,7 +2,9 @@ import os
 import json
 import logging
 import asyncio
+import subprocess
 import httpx
+import boto3
 from typing import Dict, Any, Optional
 from app.config import settings
 
@@ -12,28 +14,135 @@ logger = logging.getLogger("retailflow.llm")
 _ollama_lock = asyncio.Lock()
 
 class LLMProvider:
-    """Unified LLM interface supporting Real Local Ollama, OpenAI, Gemini, Bedrock, and Simulation."""
+    """Unified LLM interface supporting AWS Bedrock (Amazon Nova / Claude), Real Local Ollama, OpenAI, Gemini, and Simulation."""
 
     def __init__(self):
         self.provider = settings.LLM_PROVIDER.lower()
+        self.bedrock_model = settings.BEDROCK_MODEL
+        self.aws_region = settings.AWS_REGION
         self.ollama_host = settings.OLLAMA_HOST.rstrip("/")
         self.ollama_model = settings.OLLAMA_MODEL
+        self._bedrock_client = None
 
-    def set_model(self, model_name: str):
-        self.ollama_model = model_name
-        logger.info(f"Ollama active model switched to: {model_name}")
+    def _get_bedrock_client(self):
+        if self._bedrock_client is None:
+            try:
+                # 1. Try standard boto3 session
+                session = boto3.Session()
+                creds = session.get_credentials()
+                if creds:
+                    self._bedrock_client = boto3.client("bedrock-runtime", region_name=self.aws_region)
+                    return self._bedrock_client
+
+                # 2. Fallback: export credentials from AWS CLI SSO
+                res = subprocess.run(["aws", "configure", "export-credentials"], capture_output=True, text=True, check=True)
+                data = json.loads(res.stdout)
+                self._bedrock_client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=self.aws_region,
+                    aws_access_key_id=data["AccessKeyId"],
+                    aws_secret_access_key=data["SecretAccessKey"],
+                    aws_session_token=data["SessionToken"]
+                )
+            except Exception as e:
+                logger.warning(f"Could not initialize AWS Bedrock client: {e}")
+                return None
+        return self._bedrock_client
+
+    def set_model(self, model_name: str, provider: Optional[str] = None):
+        if provider:
+            self.provider = provider.lower()
+        elif "nova" in model_name.lower() or "claude" in model_name.lower() or "amazon" in model_name.lower():
+            self.provider = "bedrock"
+            self.bedrock_model = model_name
+        else:
+            self.provider = "ollama"
+            self.ollama_model = model_name
+        logger.info(f"LLM Provider switched to: {self.provider} (Model: {model_name})")
 
     def get_status(self) -> Dict[str, Any]:
+        active_model = self.bedrock_model if self.provider == "bedrock" else self.ollama_model
         return {
             "provider": self.provider,
+            "active_model": active_model,
+            "aws_region": self.aws_region,
             "ollama_host": self.ollama_host,
-            "active_model": self.ollama_model,
-            "available_local_models": ["llama3.1:latest", "gemma3:4b", "gemma4:26b"]
+            "available_models": [
+                {"id": "us.amazon.nova-pro-v1:0", "name": "Amazon Nova Pro", "provider": "bedrock", "tier": "AWS Flagship Cloud"},
+                {"id": "us.amazon.nova-lite-v1:0", "name": "Amazon Nova Lite", "provider": "bedrock", "tier": "AWS Fast Cloud"},
+                {"id": "us.amazon.nova-micro-v1:0", "name": "Amazon Nova Micro", "provider": "bedrock", "tier": "AWS Edge Cloud"},
+                {"id": "llama3.1:latest", "name": "Meta Llama 3.1 8B", "provider": "ollama", "tier": "Local Edge"},
+                {"id": "gemma3:4b", "name": "Google Gemma 3 4B", "provider": "ollama", "tier": "Local Ultra Fast"}
+            ]
         }
 
     async def generate_response(self, system_prompt: str, user_prompt: str, response_format: str = "json") -> Dict[str, Any]:
-        # 1. Local Ollama (Real On-Premise / Edge Foundation Model)
-        if self.provider == "ollama":
+        # 1. AWS Bedrock (Amazon Nova / Anthropic Claude)
+        if self.provider == "bedrock":
+            try:
+                client = self._get_bedrock_client()
+                if client:
+                    # Amazon Nova Models
+                    if "nova" in self.bedrock_model.lower():
+                        payload = {
+                            "system": [{"text": system_prompt + "\nRespond strictly in valid JSON."}],
+                            "messages": [
+                                {"role": "user", "content": [{"text": user_prompt}]}
+                            ],
+                            "inferenceConfig": {
+                                "max_new_tokens": 400,
+                                "temperature": 0.1,
+                                "top_p": 0.9
+                            }
+                        }
+                        
+                        resp = await asyncio.to_thread(
+                            client.invoke_model,
+                            modelId=self.bedrock_model,
+                            contentType="application/json",
+                            accept="application/json",
+                            body=json.dumps(payload)
+                        )
+                        raw = resp["body"].read().decode("utf-8")
+                        body = json.loads(raw)
+                        text_out = body.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+                        logger.info(f"AWS Bedrock ({self.bedrock_model}) responded: {text_out[:120]}...")
+                        
+                        if response_format == "json":
+                            parsed = self._extract_json(text_out)
+                            if parsed:
+                                return parsed
+                        return {"text": text_out}
+                        
+                    # Anthropic Claude on Bedrock
+                    elif "claude" in self.bedrock_model.lower():
+                        payload = {
+                            "anthropic_version": "bedrock-2023-05-31",
+                            "max_tokens": 400,
+                            "temperature": 0.1,
+                            "system": system_prompt + "\nRespond strictly in valid JSON.",
+                            "messages": [{"role": "user", "content": user_prompt}]
+                        }
+                        resp = await asyncio.to_thread(
+                            client.invoke_model,
+                            modelId=self.bedrock_model,
+                            contentType="application/json",
+                            accept="application/json",
+                            body=json.dumps(payload)
+                        )
+                        raw = resp["body"].read().decode("utf-8")
+                        body = json.loads(raw)
+                        text_out = body.get("content", [{}])[0].get("text", "")
+                        if response_format == "json":
+                            parsed = self._extract_json(text_out)
+                            if parsed:
+                                return parsed
+                        return {"text": text_out}
+            except Exception as e:
+                logger.warning(f"AWS Bedrock call ({self.bedrock_model}) failed: {e}. Falling back to internal engine.")
+
+        # 2. Local Ollama (Real On-Premise / Edge Foundation Model)
+        elif self.provider == "ollama":
             async with _ollama_lock:
                 try:
                     async with httpx.AsyncClient(timeout=60.0) as client:

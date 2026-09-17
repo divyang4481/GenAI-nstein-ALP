@@ -6,26 +6,40 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
   const [showReplay, setShowReplay] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [showLlmMenu, setShowLlmMenu] = useState(false);
-  const [activeModel, setActiveModel] = useState("llama3.1:latest");
-  const [availableModels, setAvailableModels] = useState(["llama3.1:latest", "gemma3:4b", "gemma4:26b"]);
+  const [activeModel, setActiveModel] = useState("us.amazon.nova-pro-v1:0");
+  const [activeProvider, setActiveProvider] = useState("bedrock");
+  const [availableModels, setAvailableModels] = useState([
+    { id: "us.amazon.nova-pro-v1:0", name: "Amazon Nova Pro", provider: "bedrock", tier: "AWS Flagship Cloud" },
+    { id: "us.amazon.nova-lite-v1:0", name: "Amazon Nova Lite", provider: "bedrock", tier: "AWS Fast Cloud" },
+    { id: "us.amazon.nova-micro-v1:0", name: "Amazon Nova Micro", provider: "bedrock", tier: "AWS Edge Cloud" },
+    { id: "llama3.1:latest", name: "Meta Llama 3.1 8B", provider: "ollama", tier: "Local Edge" },
+    { id: "gemma3:4b", name: "Google Gemma 3 4B", provider: "ollama", tier: "Local Ultra Fast" }
+  ]);
 
   useEffect(() => {
     fetchLlmStatus()
       .then((data) => {
         if (data.active_model) setActiveModel(data.active_model);
-        if (data.available_local_models) setAvailableModels(data.available_local_models);
+        if (data.provider) setActiveProvider(data.provider);
+        if (data.available_models) setAvailableModels(data.available_models);
       })
       .catch(() => {});
   }, []);
 
-  const handleSelectModel = async (model) => {
+  const handleSelectModel = async (modelItem) => {
     try {
-      await selectLlmModel(model);
-      setActiveModel(model);
+      await selectLlmModel(modelItem.id);
+      setActiveModel(modelItem.id);
+      setActiveProvider(modelItem.provider);
       setShowLlmMenu(false);
     } catch (e) {
       console.error("Failed to change LLM model", e);
     }
+  };
+
+  const getDisplayName = (id) => {
+    const found = availableModels.find(m => m.id === id);
+    return found ? found.name : id;
   };
 
   return (
@@ -40,43 +54,54 @@ export default function Header({ isReplaying, onStartReplay, onPauseReplay, onRe
           Olist Brazilian Dataset
         </span>
 
-        {/* Real Ollama Edge Model Badge & Selector */}
+        {/* Real AWS Bedrock & Ollama Model Selector */}
         <div className="relative">
           <button
             onClick={() => setShowLlmMenu(!showLlmMenu)}
             className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border border-sky-500/40 bg-sky-950/40 text-sky-200 hover:bg-sky-900/40 hover:border-sky-400 transition"
-            title="Active local LLM reasoning engine"
+            title="Active Foundation Model"
           >
             <Cpu className="h-3.5 w-3.5 text-sky-400 animate-pulse" />
-            <span className="font-semibold text-slate-100">{activeModel}</span>
-            <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded border border-sky-500/30">Ollama Local</span>
+            <span className="font-semibold text-slate-100">{getDisplayName(activeModel)}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+              activeProvider === "bedrock" 
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/30" 
+                : "bg-sky-500/20 text-sky-300 border-sky-500/30"
+            }`}>
+              {activeProvider === "bedrock" ? "AWS Bedrock" : "Ollama Local"}
+            </span>
             <ChevronDown className="h-3 w-3 text-slate-400" />
           </button>
 
           {showLlmMenu && (
-            <div className="absolute left-0 top-11 w-64 bg-white text-slate-700 rounded-xl border border-slate-200 shadow-xl p-2 z-50">
+            <div className="absolute left-0 top-11 w-72 bg-white text-slate-700 rounded-xl border border-slate-200 shadow-xl p-2 z-50">
               <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1">
-                <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Local Ollama Models</p>
-                <p className="text-[10px] text-slate-500">Real on-device inference via localhost:11434</p>
+                <p className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Foundation Models</p>
+                <p className="text-[10px] text-slate-500">AWS Bedrock Cloud & Local Ollama Edge</p>
               </div>
               <div className="space-y-1">
                 {availableModels.map((m) => (
                   <button
-                    key={m}
+                    key={m.id}
                     onClick={() => handleSelectModel(m)}
                     className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-lg transition ${
-                      activeModel === m
+                      activeModel === m.id
                         ? "bg-sky-50 text-[#0F6CBD] font-bold border border-sky-200"
                         : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
                     <div className="flex flex-col text-left">
-                      <span className="font-medium">{m}</span>
-                      <span className="text-[10px] text-slate-400">
-                        {m.includes("llama3.1") ? "Meta 8B · Recommended" : m.includes("gemma3") ? "Google 4B · Ultra Fast" : "Google 26B · High Capacity"}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold">{m.name}</span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-medium ${
+                          m.provider === "bedrock" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800"
+                        }`}>
+                          {m.provider === "bedrock" ? "AWS" : "Edge"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{m.tier}</span>
                     </div>
-                    {activeModel === m && <Check className="h-4 w-4 text-[#0F6CBD]" />}
+                    {activeModel === m.id && <Check className="h-4 w-4 text-[#0F6CBD]" />}
                   </button>
                 ))}
               </div>
