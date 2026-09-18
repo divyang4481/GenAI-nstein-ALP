@@ -20,12 +20,12 @@ export default function CaseWorkspace({ order, incident, traces, isInvestigating
   const voucher=incident?.proposed_payload?.proposed_voucher_brl;
   const slaDate=order.order_estimated_delivery_date ? new Date(order.order_estimated_delivery_date) : null;
   const slaRemaining=slaDate && !Number.isNaN(slaDate.valueOf()) ? `${Math.max(0, Math.round((slaDate-Date.now())/3600000))}h` : "Not available";
-  const caseAudit=auditLedger.filter(a=>a.order_id===order.order_id && (!incident || a.incident_id===incident.incident_id));
+  const caseAudit = auditLedger.filter(a => a.order_id === order.order_id);
   return <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-184px)] min-h-[650px] flex flex-col">
     <div className="px-6 pt-5 border-b border-slate-200">
       <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><span className="text-xs font-medium text-[#C4314B] bg-rose-50 px-2 py-1 rounded-md">Critical risk</span><span className="text-xs text-slate-500">Case RF-{order.order_id.slice(0,6).toUpperCase()}</span></div><h2 className="text-2xl font-semibold text-slate-900 mt-2">Order {order.order_id.slice(0,12).toUpperCase()}</h2><div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-slate-600"><MapPin className="h-4 w-4"/>{order.seller_city}, {order.seller_state}<ArrowRight className="h-4 w-4 text-slate-400"/>{order.customer_city}, {order.customer_state}<span className="text-slate-300">|</span><span>{order.carrier_name}</span></div></div>
         <div className="grid grid-cols-3 divide-x divide-slate-200 border border-slate-200 rounded-lg min-w-[360px]"><div className="p-3"><p className="text-[11px] text-slate-500">Risk score</p><strong className="text-lg text-[#C4314B]">{score}%</strong></div><div className="p-3"><p className="text-[11px] text-slate-500">SLA remaining</p><strong className="text-lg text-slate-900">{slaRemaining}</strong></div><div className="p-3"><p className="text-[11px] text-slate-500">Order value</p><strong className="text-lg text-slate-900">R$ {order.price.toFixed(2)}</strong></div></div></div>
-      <nav className="flex gap-6 mt-5">{[["case","Case overview"],["evidence","AI evidence & trace"],["ask","Ask this case"],["audit","Audit history"]].map(([v,l])=><button key={v} onClick={()=>setTab(v)} className={`pb-3 text-xs font-medium border-b-2 ${tab===v?"border-[#0F6CBD] text-[#0F6CBD]":"border-transparent text-slate-500"}`}>{l}{v==="evidence"&&traces.length>0?` (${traces.length})`:""}</button>)}</nav>
+      <nav className="flex gap-6 mt-5">{[["case","Case overview"],["evidence","AI evidence & trace"],["ask","Ask this case"],["audit","Audit history"]].map(([v,l])=><button key={v} onClick={()=>setTab(v)} className={`pb-3 text-xs font-medium border-b-2 ${tab===v?"border-[#0F6CBD] text-[#0F6CBD]":"border-transparent text-slate-500"}`}>{l}{v==="evidence"&&traces.length>0?` (${traces.length})`:v==="audit"&&caseAudit.length>0?` (${caseAudit.length})`:""}</button>)}</nav>
     </div>
     <div className="flex-1 overflow-auto bg-[#F8FAFC] p-6">
       {tab==="case" && <div className="grid xl:grid-cols-[1fr_360px] gap-5">
@@ -199,7 +199,62 @@ export default function CaseWorkspace({ order, incident, traces, isInvestigating
       </div>}
       {tab==="evidence" && <AgentInspector selectedOrder={order} activeIncident={incident} traces={traces} isInvestigating={isInvestigating} onRunInvestigation={onInvestigate}/>} 
       {tab==="ask" && <div className="space-y-4"><div className="bg-white border border-slate-200 rounded-xl p-5"><div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Ask this case</h3><span className="text-[11px] bg-slate-100 px-2 py-1 rounded">Read-only advisory</span></div>{answer&&<div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4"><div className="flex gap-2 mb-2"><span className={`text-[10px] px-2 py-1 rounded font-semibold ${answer.retrieval_quality==="GROUNDED"?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{answer.retrieval_quality==="GROUNDED"?"Grounded answer":"Insufficient evidence"}</span><span className="text-[10px] px-2 py-1 rounded bg-white text-slate-600">{answer.execution_mode==="AWS_BEDROCK"?"Bedrock":"Demo fallback"}</span></div><p className="text-sm text-slate-800">{answer.answer}</p>{answer.retrieved_sources?.length>0&&<details className="mt-3"><summary className="text-xs font-semibold cursor-pointer">Sources used ({answer.retrieved_sources.length})</summary><div className="mt-2 space-y-2">{answer.retrieved_sources.map(s=><div key={s.chunk_id} className="bg-white border rounded p-3 text-xs"><strong>{s.title}</strong><p className="text-slate-500">{s.policy_id||s.case_id} · version {s.version} · score {s.score.toFixed(3)}</p><p className="mt-1 text-slate-600">{s.text_excerpt}</p></div>)}</div></details>}</div>}<div className="flex gap-2 mt-4"><input value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>e.key==="Enter"&&question&&ask()} placeholder="Ask about evidence, policy, or permitted actions" className="flex-1 border rounded-lg px-3 py-2 text-sm"/><button disabled={!question||asking} onClick={()=>ask()} className="bg-[#0F6CBD] text-white rounded-lg px-4 text-sm disabled:opacity-50">{asking?"Retrieving…":"Ask"}</button></div>{askError&&<p role="alert" className="text-sm text-rose-700 mt-2">{askError}</p>}</div><div className="flex flex-wrap gap-2">{["Why is this order at risk?","Which policy allows the voucher?","Can the customer be contacted automatically?","What evidence supports carrier escalation?"].map(q=><button key={q} onClick={()=>ask(q)} className="text-xs bg-white border border-slate-200 rounded-full px-3 py-2 hover:border-blue-400">{q}</button>)}</div></div>}
-      {tab==="audit" && <div className="bg-white border border-slate-200 rounded-xl p-5"><h3 className="text-sm font-semibold flex items-center gap-2"><History className="h-4 w-4"/>Audit history</h3><div className="mt-4 divide-y divide-slate-100">{caseAudit.length?caseAudit.map(a=><div key={a.action_id} className="py-3 flex justify-between text-xs"><div><p className="font-medium text-slate-900">{a.action_type.replaceAll("_"," ")}</p><p className="text-slate-500 mt-1">{a.action_id} · {a.approved_by}</p></div><span className="text-[#1A7F37] font-semibold">{a.status}</span></div>):<p className="text-xs text-slate-500 py-8 text-center">No actions have been recorded for this case.</p>}</div></div>}
+      {tab==="audit" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <History className="h-4 w-4 text-[#0F6CBD]"/>Compliance Audit History
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">Immutable record of Human-in-the-Loop reviewer authorizations for this case</p>
+            </div>
+            <span className="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-medium">
+              PostgreSQL Action Ledger
+            </span>
+          </div>
+          {caseAudit.length > 0 ? (
+            <div className="space-y-3">
+              {caseAudit.map(a => (
+                <div key={a.action_id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900">{a.action_type.replaceAll("_", " ")}</span>
+                      <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">{a.action_id}</span>
+                    </div>
+                    <span className={`text-[11px] px-2 py-0.5 rounded font-semibold ${a.status === "APPROVED_FOR_EXECUTION" ? "bg-emerald-100 text-[#1A7F37]" : "bg-rose-100 text-rose-700"}`}>
+                      {a.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
+                    <div>
+                      <span className="text-slate-400">Authorised by: </span>
+                      <span className="font-medium text-slate-800">{a.approved_by || "Operations Specialist"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Timestamp: </span>
+                      <span className="font-mono text-[11px]">{a.executed_at ? new Date(a.executed_at).toLocaleString() : "Recently"}</span>
+                    </div>
+                  </div>
+                  {a.notes && (
+                    <div className="text-xs bg-white border border-slate-200 rounded p-2.5 text-slate-700 mt-2">
+                      <span className="font-semibold text-slate-500 block text-[10px] uppercase tracking-wider">Reviewer Rationale</span>
+                      "{a.notes}"
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center text-xs text-slate-400">
+              <History className="h-8 w-8 mx-auto text-slate-300 mb-2"/>
+              <p className="font-medium text-slate-600">No human decisions recorded yet for this order</p>
+              <p className="text-slate-400 mt-1 max-w-sm mx-auto">
+                Trigger risk analysis, review the recovery plan, and click <strong>"Approve recovery plan"</strong> or <strong>"Reject"</strong> in the Case overview tab to record a permanent audit entry.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   </section>;
 }

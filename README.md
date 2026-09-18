@@ -99,13 +99,42 @@ DRAFT → PENDING_REVIEW → APPROVED_FOR_EXECUTION → CONNECTOR_QUEUED → EXE
 
 This project stops at `APPROVED_FOR_EXECUTION`. Approval does **not** claim carrier escalation, customer contact, a refund, or voucher issuance occurred. Case chat is read-only and answers execution requests with a draft-and-review boundary.
 
+### Framework Choice: Why a Custom Agent Harness?
+
+RetailFlow uses a custom **FastAPI + A2A + MCP** orchestrator rather than LangChain, CrewAI, AutoGen, or AWS Bedrock Agents:
+* **Deterministic Guardrails vs Probabilistic Chat**: Financial safety rules, BRL voucher caps, and human-in-the-loop gates are executed via pure deterministic Python ([`GuardrailEngine`](file:///c:/workspace/CTS_GenAI/Project/GenAI-nstein-ALP/backend/app/guardrails.py)), preventing prompt injection bypasses common in multi-agent LLM self-reflection.
+* **Open Standard Tooling (MCP)**: All tool definitions and database queries route through the standardized **Model Context Protocol (MCP)** over Streamable HTTP (`http://mcp-server:8001`), keeping tool logic completely decoupled from agent reasoning.
+* **Cloud Agnostic & Zero Lock-in**: The orchestrator is 100% portable. It connects to AWS Bedrock (`Nova Lite`) via Boto3, but can switch to Azure OpenAI, GCP Vertex AI, or local models via configuration without rewriting agent graph logic.
+
+### Multi-Tiered Memory Architecture
+
+The system implements a structured 3-tier memory model:
+1. **Working Memory (Short-Term)**: In-flight A2A task envelopes and FastAPI memory context tracking intermediate thoughts, tool outputs, and the active investigation trace.
+2. **Semantic Memory (RAG / Knowledge)**: **Qdrant Vector Database** (`retailflow_knowledge` collection) indexing 300–500-word policy playbooks and historical logistics case precedents via dense vector similarity.
+3. **Episodic & Audit Memory (Long-Term)**: **PostgreSQL** relational tables:
+   - `agent_traces`: Immutable step-by-step logs of all agent thoughts, tool inputs, responses, latencies, and token usage.
+   - `action_ledger`: Permanent compliance audit trail recording human supervisor approvals, edits, and rejections.
+   - `seller_history`: Longitudinal merchant fulfillment reliability metrics.
+
+### Cloud Ecosystem Comparison (RetailFlow vs AWS Native vs Azure Native)
+
+| Architectural Layer | RetailFlow Architecture | AWS Native Equivalent | Azure Native Equivalent |
+|---|---|---|---|
+| **Multi-Agent Orchestration** | Custom FastAPI + A2A Envelopes | AWS Bedrock Agents / Step Functions | Azure AI Agent Service / Semantic Kernel |
+| **Tool Execution Protocol** | FastMCP Server (MCP Streamable HTTP) | Bedrock Action Groups (OpenAPI to Lambda) | Azure AI Functions / OpenAPI Tools |
+| **Semantic Memory (Vector RAG)** | Qdrant Vector DB (Cosine Search) | Amazon OpenSearch Serverless / Bedrock KB | Azure AI Search (Vector + Semantic Reranker) |
+| **Working / Session Memory** | In-Memory Task Context + WebSocket | Amazon MemoryDB for Redis / DynamoDB | Azure Cache for Redis / Cosmos DB |
+| **Episodic / Audit Memory** | PostgreSQL (`agent_traces`, `action_ledger`) | Amazon Aurora PostgreSQL / DynamoDB | Azure Database for PostgreSQL / Cosmos DB |
+| **LLM Generation** | Amazon Bedrock (`us.amazon.nova-lite-v1:0`) | Amazon Bedrock (Nova / Claude / Llama) | Azure OpenAI (`GPT-4o` / `GPT-4o-mini`) |
+| **Safety & Guardrails** | Deterministic Python (`GuardrailEngine`) | Amazon Bedrock Guardrails | Azure AI Content Safety |
+
 ## What remains simulated
 
 * Events and orders are a historical Olist replay, never live marketplace data.
 * External carrier and CRM connectors do not exist.
 * Voucher issuance, refunds, money movement, and customer-message delivery do not exist.
 * The retention value is explicitly a demo indicator, not a measured financial outcome.
-* The deterministic embedding fallback is intended for development; production should use Titan embeddings.
+* The deterministic embedding fallback is intended for laptop development; production should use Titan embeddings.
 
 ## Local development without Docker
 

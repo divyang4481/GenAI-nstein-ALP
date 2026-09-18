@@ -553,4 +553,76 @@ sequenceDiagram
 - **Immutable Audit Ledger**: 100% of agent thoughts, tool inputs, outputs, latencies, and human reviewer decisions are persisted to PostgreSQL `agent_traces` and `action_ledger`.
 - **Ground-Truth Evaluation Harness**: Automated benchmarking suite ([`backend/app/eval/benchmark.py`](file:///c:/workspace/CTS_GenAI/Project/GenAI-nstein-ALP/backend/app/eval/benchmark.py)) evaluating Precision, Recall, JSON Validity, and Guardrail Compliance across ground-truth datasets.
 
+### 11.6 Framework Rationale: Why Custom FastAPI + A2A + MCP (Not LangChain / CrewAI / Bedrock Agents)
+
+| Dimension | Custom Harness (FastAPI + A2A + MCP) | CrewAI / AutoGen | LangChain / LangGraph | AWS Bedrock Agents |
+|---|---|---|---|---|
+| **Safety Governance** | **Deterministic Python Rules** ([`GuardrailEngine`](file:///c:/workspace/CTS_GenAI/Project/GenAI-nstein-ALP/backend/app/guardrails.py)) | Probabilistic LLM self-reflection | Complex graph interceptors | Cloud-managed Guardrails |
+| **Tool Execution** | **Model Context Protocol (MCP)** over Streamable HTTP | Custom tool decorators | Python callable wrappers | OpenAPI Action Groups calling Lambda |
+| **Inter-Agent Handoffs** | **A2A Task Envelopes** (`task_id`, `correlation_id`, state cards) | Unstructured internal chat loops | Graph channel state | Managed orchestrator routing |
+| **Vendor Portability** | **100% Cloud-Agnostic** (AWS Bedrock, Azure OpenAI, GCP, Local) | Portable but dependency-heavy | Portable but high churn | **Strictly locked to AWS** |
+| **Auditability** | Complete DB trace persistence (`AgentTraceModel`) | Ephemeral console output | LangSmith SaaS dependency | CloudWatch / AWS X-Ray |
+
+### 11.7 Multi-Tiered Memory Architecture
+
+RetailFlow structures memory across three distinct temporal and functional layers:
+
+1. **Working Memory (In-Flight Investigation Context)**:
+   - **Mechanism**: Dynamic memory state passed through A2A HTTP task envelopes.
+   - **Scope**: Ephemeral during single-case evaluation; tracks intermediate thoughts, tool outputs, and LLM completions.
+2. **Semantic Memory (Knowledge & Precedent Retrieval)**:
+   - **Mechanism**: **Qdrant Vector Database** (`retailflow_knowledge` collection) indexing policy playbooks and historical resolution cases with dense Cosine embeddings.
+   - **Scope**: Long-term enterprise reference; filtered by source metadata (`source_type`, `category`).
+3. **Episodic & Audit Memory (Stateful Operations History)**:
+   - **Mechanism**: Relational persistence in **PostgreSQL**:
+     - `AgentTraceModel`: Trace ID, parent task, agent identity, tool input/output, execution latency, and token metrics.
+     - `ActionLedgerModel`: Immutable audit record of human supervisor approvals, edits, and rejections.
+     - `SellerHistoryModel`: Longitudinal performance data across marketplace sellers.
+
+### 11.8 Cloud Platform Mapping: RetailFlow vs AWS Native vs Azure Native
+
+```mermaid
+graph TB
+    subgraph "RetailFlow Custom Architecture"
+        RF_Orch["FastAPI + A2A Envelopes"]
+        RF_Tool["FastMCP Server (Port 8001)"]
+        RF_Vec["Qdrant Vector Store"]
+        RF_Mem["PostgreSQL (Traces & Audit)"]
+        RF_LLM["AWS Bedrock (Nova Lite)"]
+        RF_Safe["GuardrailEngine (Deterministic)"]
+    end
+
+    subgraph "AWS Native Architecture"
+        AWS_Orch["Bedrock Multi-Agent / Step Functions"]
+        AWS_Tool["Bedrock Action Groups + Lambda"]
+        AWS_Vec["Amazon OpenSearch Serverless / Bedrock KB"]
+        AWS_Mem["Amazon Aurora PostgreSQL / DynamoDB"]
+        AWS_LLM["Amazon Bedrock (Nova / Claude)"]
+        AWS_Safe["Amazon Bedrock Guardrails"]
+    end
+
+    subgraph "Azure Native Architecture"
+        AZ_Orch["Azure AI Agent Service / Semantic Kernel"]
+        AZ_Tool["Azure AI Functions / OpenAPI Tools"]
+        AZ_Vec["Azure AI Search (Semantic Reranker)"]
+        AZ_Mem["Azure Database for PostgreSQL / Cosmos DB"]
+        AZ_LLM["Azure OpenAI (GPT-4o)"]
+        AZ_Safe["Azure AI Content Safety"]
+    end
+
+    RF_Orch -.-> AWS_Orch
+    RF_Orch -.-> AZ_Orch
+    RF_Tool -.-> AWS_Tool
+    RF_Tool -.-> AZ_Tool
+    RF_Vec -.-> AWS_Vec
+    RF_Vec -.-> AZ_Vec
+    RF_Mem -.-> AWS_Mem
+    RF_Mem -.-> AZ_Mem
+    RF_LLM -.-> AWS_LLM
+    RF_LLM -.-> AZ_LLM
+    RF_Safe -.-> AWS_Safe
+    RF_Safe -.-> AZ_Safe
+```
+
+
 

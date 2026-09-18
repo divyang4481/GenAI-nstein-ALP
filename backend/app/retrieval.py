@@ -14,8 +14,11 @@ except ImportError:  # local unit tests can exercise the deterministic memory st
     AsyncQdrantClient = None
 
 
+import asyncio
+import json
+
 COLLECTION = "retailflow_knowledge"
-VECTOR_SIZE = 384
+VECTOR_SIZE = 1024
 
 
 @dataclass
@@ -38,7 +41,7 @@ class RetrievedSource:
 
 
 class LocalHashEmbedder:
-    """Offline deterministic development fallback; production uses Titan via Bedrock."""
+    """Offline deterministic development fallback."""
 
     model_name = "local-hash-embedding-v1"
 
@@ -52,9 +55,50 @@ class LocalHashEmbedder:
         return [value / norm for value in vector]
 
 
+class BedrockTitanEmbedder:
+    """Real Amazon Titan Text Embeddings via AWS Bedrock."""
+
+    model_name = "amazon.titan-embed-text-v2:0"
+
+    def __init__(self, model_id: str = "amazon.titan-embed-text-v2:0", fallback: Any | None = None):
+        self.model_id = model_id
+        self.model_name = model_id
+        self.fallback = fallback or LocalHashEmbedder()
+        self._client = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                from app.agents.llm_provider import llm_provider
+                self._client = llm_provider._get_bedrock_client()
+            except Exception:
+                self._client = None
+        return self._client
+
+    async def embed(self, text: str) -> list[float]:
+        client = self._get_client()
+        if client:
+            try:
+                payload = {"inputText": text[:8192]}
+                res = await asyncio.to_thread(
+                    client.invoke_model,
+                    modelId=self.model_id,
+                    contentType="application/json",
+                    accept="application/json",
+                    body=json.dumps(payload)
+                )
+                body = json.loads(res["body"].read().decode("utf-8"))
+                embedding = body.get("embedding")
+                if embedding and len(embedding) == VECTOR_SIZE:
+                    return embedding
+            except Exception:
+                pass
+        return await self.fallback.embed(text)
+
+
 class RetrievalService:
     def __init__(self, url: str | None = None, embedder: Any | None = None, client: Any | None = None):
-        self.embedder = embedder or LocalHashEmbedder()
+        self.embedder = embedder or BedrockTitanEmbedder()
         self._url = url or settings.QDRANT_URL
         self._client = client
         self._memory: list[tuple[list[float], dict[str, Any]]] = []

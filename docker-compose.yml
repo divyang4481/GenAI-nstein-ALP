@@ -86,7 +86,10 @@ services:
     environment:
       <<: *backend-env
     volumes:
-      - ${USERPROFILE:-~}/.aws:/root/.aws:ro
+      - ./knowledge:/knowledge
+      - ./scripts:/scripts
+      - ./backend/app:/app/app
+      - ${USERPROFILE:-~}/.aws:/root/.aws
     depends_on:
       qdrant: {condition: service_healthy}
     restart: "no"
