@@ -23,9 +23,10 @@ export default function LiveEventStream({ orders = [], incidents = [], selectedO
     for (const o of orders) {
       const inc = incidentMap[o.order_id];
       const isApproved = inc?.status === "APPROVED_FOR_EXECUTION" || inc?.status === "APPROVED" || inc?.resolution_decision === "APPROVED";
+      const isPending = !isApproved && (inc?.status === "PENDING_REVIEW" || inc?.status === "BLOCKED_HUMAN_REVIEW_REQUIRED" || inc?.status?.includes("REVIEW") || inc?.status?.includes("BLOCKED"));
       if (isApproved) {
         approved += 1;
-      } else if (o.is_at_risk || inc?.status === "PENDING_REVIEW") {
+      } else if (o.is_at_risk || isPending) {
         needsAttention += 1;
       }
     }
@@ -36,12 +37,13 @@ export default function LiveEventStream({ orders = [], incidents = [], selectedO
     .filter(o => {
       const inc = incidentMap[o.order_id];
       const isApproved = inc?.status === "APPROVED_FOR_EXECUTION" || inc?.status === "APPROVED" || inc?.resolution_decision === "APPROVED";
+      const isPending = !isApproved && (inc?.status === "PENDING_REVIEW" || inc?.status === "BLOCKED_HUMAN_REVIEW_REQUIRED" || inc?.status?.includes("REVIEW") || inc?.status?.includes("BLOCKED"));
       
       if (filter === "APPROVED") {
         return isApproved;
       }
       if (filter === "RISK") {
-        return (o.is_at_risk || inc?.status === "PENDING_REVIEW") && !isApproved;
+        return (o.is_at_risk || isPending) && !isApproved;
       }
       return true; // "ALL"
     })
@@ -96,7 +98,7 @@ export default function LiveEventStream({ orders = [], incidents = [], selectedO
           const selected = order.order_id === selectedOrderId;
           const inc = incidentMap[order.order_id];
           const isApproved = inc?.status === "APPROVED_FOR_EXECUTION" || inc?.status === "APPROVED" || inc?.resolution_decision === "APPROVED";
-          const isPending = inc?.status === "PENDING_REVIEW";
+          const isPending = !isApproved && (inc?.status === "PENDING_REVIEW" || inc?.status === "BLOCKED_HUMAN_REVIEW_REQUIRED" || inc?.status?.includes("REVIEW") || inc?.status?.includes("BLOCKED"));
 
           return (
             <button

@@ -123,7 +123,17 @@ class RetrievalService:
         if not client:
             return
         try:
-            if not await client.collection_exists(COLLECTION):
+            if await client.collection_exists(COLLECTION):
+                try:
+                    info = await client.get_collection(COLLECTION)
+                    vectors_conf = info.config.params.vectors
+                    curr_size = getattr(vectors_conf, "size", None) if not isinstance(vectors_conf, dict) else vectors_conf.get("size")
+                    if curr_size and curr_size != VECTOR_SIZE:
+                        await client.delete_collection(COLLECTION)
+                        await client.create_collection(COLLECTION, vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE))
+                except Exception:
+                    pass
+            else:
                 await client.create_collection(COLLECTION, vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE))
         except Exception:
             pass

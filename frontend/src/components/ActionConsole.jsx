@@ -20,7 +20,14 @@ export default function ActionConsole({
   const [reviewerNotes, setReviewerNotes] = useState("Verified route congestion and seller late history. Approved for carrier escalation.");
   const [reviewerName, setReviewerName] = useState("Ops Specialist (Divyang)");
 
-  const isPending = activeIncident?.status === "PENDING_REVIEW";
+  const isApproved = activeIncident?.status === "APPROVED_FOR_EXECUTION" || activeIncident?.status === "APPROVED" || activeIncident?.resolution_decision === "APPROVED";
+  const isRejected = activeIncident?.status === "REJECTED" || activeIncident?.resolution_decision === "REJECTED";
+  const isPending = !isApproved && !isRejected && (
+    activeIncident?.status === "PENDING_REVIEW" || 
+    activeIncident?.status === "BLOCKED_HUMAN_REVIEW_REQUIRED" ||
+    activeIncident?.status?.includes("REVIEW") ||
+    activeIncident?.status?.includes("BLOCKED")
+  );
   const payload = activeIncident?.proposed_payload || {};
 
   return (
@@ -40,9 +47,9 @@ export default function ActionConsole({
 
         {activeIncident && (
           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
-            activeIncident.status === "APPROVED" 
+            isApproved 
               ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-              : activeIncident.status === "REJECTED"
+              : isRejected
               ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
               : "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse"
           }`}>

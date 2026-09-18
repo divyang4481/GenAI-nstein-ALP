@@ -22,7 +22,7 @@ def main():
     print(">> Starting RetailFlow in Docker with Live AWS Bedrock Connection")
     print("=" * 75)
 
-    profile = os.environ.get("AWS_PROFILE", "divyang")
+    profile = os.environ.get("AWS_PROFILE", "default")
     region = os.environ.get("AWS_REGION", "us-east-1")
     model = os.environ.get("BEDROCK_MODEL", "us.amazon.nova-lite-v1:0")
 
@@ -39,22 +39,33 @@ def main():
 
     # If AWS CLI is present, attempt to export active session credentials
     aws_cmd = shutil.which("aws")
-    if aws_cmd and profile:
-        try:
-            print(f"Attempting to resolve AWS credentials for profile '{profile}'...")
-            res = subprocess.check_output(
-                [aws_cmd, "configure", "export-credentials", "--profile", profile, "--region", region],
-                timeout=8,
-                stderr=subprocess.PIPE
-            )
-            creds = json.loads(res.decode("utf-8"))
-            if "AccessKeyId" in creds:
-                env["AWS_ACCESS_KEY_ID"] = creds["AccessKeyId"]
-                env["AWS_SECRET_ACCESS_KEY"] = creds["SecretAccessKey"]
-                env["AWS_SESSION_TOKEN"] = creds.get("SessionToken", "")
-                print(">> [SUCCESS] Successfully exported active AWS session credentials to Docker environment!")
-        except Exception as e:
-            print(f"Note: Standard AWS credentials lookup will be used ({e}).")
+    if aws_cmd:
+        exported = False
+        profiles_to_try = [profile] if profile else []
+        for p in ["default", "divyang"]:
+            if p not in profiles_to_try:
+                profiles_to_try.append(p)
+        for p in profiles_to_try:
+            try:
+                print(f"Attempting to resolve AWS credentials for profile '{p}'...")
+                res = subprocess.check_output(
+                    [aws_cmd, "configure", "export-credentials", "--profile", p, "--region", region],
+                    timeout=8,
+                    stderr=subprocess.PIPE
+                )
+                creds = json.loads(res.decode("utf-8"))
+                if "AccessKeyId" in creds:
+                    env["AWS_ACCESS_KEY_ID"] = creds["AccessKeyId"]
+                    env["AWS_SECRET_ACCESS_KEY"] = creds["SecretAccessKey"]
+                    env["AWS_SESSION_TOKEN"] = creds.get("SessionToken", "")
+                    env["AWS_PROFILE"] = p
+                    print(f">> [SUCCESS] Successfully exported active AWS session credentials for '{p}' to Docker environment!")
+                    exported = True
+                    break
+            except Exception:
+                continue
+        if not exported:
+            print("Note: Standard AWS credentials lookup will be used.")
 
     # Check docker command
     docker_cmd = shutil.which("docker")

@@ -15,7 +15,12 @@ export default function CaseWorkspace({ order, incident, traces, isInvestigating
   const score=Math.round((order.risk_score||0)*100);
   const isApproved = incident?.status === "APPROVED_FOR_EXECUTION" || incident?.status === "APPROVED" || incident?.resolution_decision === "APPROVED";
   const isRejected = incident?.status === "REJECTED" || incident?.resolution_decision === "REJECTED";
-  const pending = !isApproved && !isRejected && incident?.status === "PENDING_REVIEW";
+  const pending = !isApproved && !isRejected && (
+    incident?.status === "PENDING_REVIEW" || 
+    incident?.status === "BLOCKED_HUMAN_REVIEW_REQUIRED" ||
+    incident?.status?.includes("REVIEW") ||
+    incident?.status?.includes("BLOCKED")
+  );
   const recommendation=incident?.recommended_action || "Run risk analysis to generate an evidence-based recovery recommendation.";
   const voucher=incident?.proposed_payload?.proposed_voucher_brl;
   const slaDate=order.order_estimated_delivery_date ? new Date(order.order_estimated_delivery_date) : null;
